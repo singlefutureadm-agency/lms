@@ -27,7 +27,7 @@ class CursoControllerIT extends IntegrationTestBase {
         Area area = areaRepository.findAll().get(0);
         CursoRequest request = new CursoRequest(
                 "Curso Com Módulos", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo 1", 1, null), new ModuloRequest(null, "Módulo 2", 2, null)),
+                List.of(new ModuloRequest(null, "Módulo 1", 1, null, null), new ModuloRequest(null, "Módulo 2", 2, null, null)),
                 null, null);
 
         String resposta = mockMvc.perform(post("/api/cursos")
@@ -54,7 +54,7 @@ class CursoControllerIT extends IntegrationTestBase {
         Area area = areaRepository.findAll().get(0);
         CursoRequest criar = new CursoRequest(
                 "Curso Original", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo Original", 1, null)), null, null);
+                List.of(new ModuloRequest(null, "Módulo Original", 1, null, null)), null, null);
 
         String resposta = mockMvc.perform(post("/api/cursos")
                         .header("Authorization", "Bearer " + tokenPara(admin))
@@ -66,7 +66,7 @@ class CursoControllerIT extends IntegrationTestBase {
 
         CursoRequest atualizar = new CursoRequest(
                 "Curso Original", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo Novo A", 1, null), new ModuloRequest(null, "Módulo Novo B", 2, null)),
+                List.of(new ModuloRequest(null, "Módulo Novo A", 1, null, null), new ModuloRequest(null, "Módulo Novo B", 2, null, null)),
                 null, null);
 
         mockMvc.perform(put("/api/cursos/{id}", cursoId)
@@ -107,7 +107,7 @@ class CursoControllerIT extends IntegrationTestBase {
         List<ModuloRequest> modulosRequest = cursoRecarregado.getModulos().stream()
                 .map(m -> new ModuloRequest(m.getId(),
                         m.getId().equals(moduloComAula.getId()) ? "Módulo 1 - Editado" : m.getTitulo(),
-                        m.getOrdem(), m.getUrlVideo()))
+                        m.getOrdem(), m.getUrlVideo(), m.getTipoVideo()))
                 .toList();
         CursoRequest atualizar = new CursoRequest(
                 cursoRecarregado.getTitulo(), cursoRecarregado.getDescricao(), cursoRecarregado.getNivel(),
@@ -168,5 +168,69 @@ class CursoControllerIT extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void criarCurso_comModuloLinkYoutubeValido_gravaUrlETipo() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin5@teste.com", "senha123", Usuario.Role.ADMIN);
+        Area area = areaRepository.findAll().get(0);
+        CursoRequest request = new CursoRequest(
+                "Curso Com Youtube", "desc", Curso.Nivel.BASICO, null, area.getId(),
+                List.of(new ModuloRequest(null, "Módulo 1", 1,
+                        "https://www.youtube.com/watch?v=dQw4w9WgXcQ", Modulo.TipoVideo.YOUTUBE)),
+                null, null);
+
+        String resposta = mockMvc.perform(post("/api/cursos")
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        long cursoId = objectMapper.readTree(resposta).get("id").asLong();
+        Modulo modulo = cursoRepository.findById(cursoId).orElseThrow().getModulos().get(0);
+        assertEquals(Modulo.TipoVideo.YOUTUBE, modulo.getTipoVideo());
+        assertEquals("https://www.youtube.com/watch?v=dQw4w9WgXcQ", modulo.getUrlVideo());
+    }
+
+    @Test
+    void criarCurso_comModuloLinkVimeoValido_gravaUrlETipo() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin6@teste.com", "senha123", Usuario.Role.ADMIN);
+        Area area = areaRepository.findAll().get(0);
+        CursoRequest request = new CursoRequest(
+                "Curso Com Vimeo", "desc", Curso.Nivel.BASICO, null, area.getId(),
+                List.of(new ModuloRequest(null, "Módulo 1", 1,
+                        "https://vimeo.com/123456789", Modulo.TipoVideo.VIMEO)),
+                null, null);
+
+        String resposta = mockMvc.perform(post("/api/cursos")
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        long cursoId = objectMapper.readTree(resposta).get("id").asLong();
+        Modulo modulo = cursoRepository.findById(cursoId).orElseThrow().getModulos().get(0);
+        assertEquals(Modulo.TipoVideo.VIMEO, modulo.getTipoVideo());
+    }
+
+    @Test
+    void criarCurso_comModuloLinkYoutubeMalformado_retorna400() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin7@teste.com", "senha123", Usuario.Role.ADMIN);
+        Area area = areaRepository.findAll().get(0);
+        // URL de um site qualquer, não do YouTube — tipoVideo=YOUTUBE exige o padrão
+        // youtube.com/watch?v=... ou youtu.be/...
+        CursoRequest request = new CursoRequest(
+                "Curso Com Link Ruim", "desc", Curso.Nivel.BASICO, null, area.getId(),
+                List.of(new ModuloRequest(null, "Módulo 1", 1,
+                        "https://exemplo.com/video", Modulo.TipoVideo.YOUTUBE)),
+                null, null);
+
+        mockMvc.perform(post("/api/cursos")
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -7,7 +7,8 @@ export interface TipoCurso { id: number; nome: string; slug: string; }
 export interface Area { id: number; nome: string; slug: string; categorias: CategoriaInfo[]; }
 export interface Curso { id: number; titulo: string; descricao: string; nivel: string; criadoEm: string; unidadeId: number | null; unidadeNome: string | null; areaId: number | null; areaNome: string | null; imagemUrl: string | null; categorias: CategoriaInfo[]; tipos: TipoCurso[]; }
 export interface AulaInfo { id: number; moduloId: number; titulo: string; urlVideo: string | null; duracaoMin: number; ordem: number; }
-export interface ModuloInfo { id: number; titulo: string; ordem: number; urlVideo: string | null; aulas: AulaInfo[]; }
+export type TipoVideoModulo = 'ARQUIVO' | 'YOUTUBE' | 'VIMEO';
+export interface ModuloInfo { id: number; titulo: string; ordem: number; urlVideo: string | null; tipoVideo: TipoVideoModulo | null; aulas: AulaInfo[]; }
 export interface CursoDetalhe extends Curso { modulos: ModuloInfo[]; }
 /**
  * Shape do PagedModel do Spring Data. O backend passou a serializar Page com

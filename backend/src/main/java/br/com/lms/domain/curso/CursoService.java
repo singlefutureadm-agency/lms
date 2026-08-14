@@ -154,6 +154,7 @@ public class CursoService {
                     .titulo(modReq.titulo())
                     .ordem(modReq.ordem())
                     .urlVideo(modReq.urlVideo())
+                    .tipoVideo(modReq.tipoVideo())
                     .curso(curso)
                     .build());
         }
@@ -192,9 +193,13 @@ public class CursoService {
         }
         curso.getModulos().removeAll(removidos);
         // Módulo removido inteiro leva o vídeo junto: sem isso o arquivo ficava
-        // órfão no disco (a linha em `modulos` some por orphanRemoval, o arquivo não).
+        // órfão no disco (a linha em `modulos` some por orphanRemoval, o arquivo
+        // não). Só existe arquivo físico pra apagar quando é ARQUIVO — YOUTUBE/
+        // VIMEO é só um link, não tem nada em /uploads pra remover.
         for (Modulo modulo : removidos) {
-            uploadService.deletar(modulo.getUrlVideo());
+            if (modulo.getTipoVideo() == Modulo.TipoVideo.ARQUIVO) {
+                uploadService.deletar(modulo.getUrlVideo());
+            }
         }
 
         for (ModuloRequest modReq : requests) {
@@ -203,6 +208,7 @@ public class CursoService {
                         .titulo(modReq.titulo())
                         .ordem(modReq.ordem())
                         .urlVideo(modReq.urlVideo())
+                        .tipoVideo(modReq.tipoVideo())
                         .curso(curso)
                         .build());
                 continue;
@@ -215,14 +221,19 @@ public class CursoService {
             // entidade é atualizada primeiro, o arquivo antigo só é apagado depois —
             // mesma ordem usada em VideoUploadService, pra não deixar a entidade
             // apontando pra um arquivo já removido se algo falhar no meio do caminho.
-            // Normalmente o upload/remoção já rolou antes via /api/upload/modulo/**, e
-            // aqui só persiste a urlVideo que o front já tinha atualizado — mas isso
-            // também cobre quem chamar o PUT direto (Swagger etc.) sem passar por lá.
+            // Normalmente o upload/remoção/link já rolou antes via /api/upload/modulo/**
+            // ou direto no request (YOUTUBE/VIMEO), e aqui só persiste o que o front já
+            // tinha atualizado — mas isso também cobre quem chamar o PUT direto (Swagger
+            // etc.) sem passar por lá. Só apaga arquivo físico se o vídeo ANTERIOR era
+            // ARQUIVO — trocar um link de YouTube por outro vídeo não tem nada em
+            // /uploads pra remover.
             String urlVideoAnterior = existente.getUrlVideo();
+            boolean anteriorEraArquivo = existente.getTipoVideo() == Modulo.TipoVideo.ARQUIVO;
             existente.setTitulo(modReq.titulo());
             existente.setOrdem(modReq.ordem());
             existente.setUrlVideo(modReq.urlVideo());
-            if (urlVideoAnterior != null && !urlVideoAnterior.equals(modReq.urlVideo())) {
+            existente.setTipoVideo(modReq.tipoVideo());
+            if (anteriorEraArquivo && urlVideoAnterior != null && !urlVideoAnterior.equals(modReq.urlVideo())) {
                 uploadService.deletar(urlVideoAnterior);
             }
         }

@@ -13,7 +13,9 @@ import br.com.lms.domain.presenca.PresencaAula;
 import br.com.lms.domain.regiao.Regiao;
 import br.com.lms.domain.regiao.Unidade;
 import br.com.lms.domain.usuario.Usuario;
+import br.com.lms.dto.validation.ValidVideoModulo;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
@@ -60,7 +62,10 @@ public class DTOs {
         @NotNull Curso.Nivel nivel,
         @Schema(description = "Opcional: restringe o curso a uma unidade") Long unidadeId,
         @NotNull Long areaId,
-        List<ModuloRequest> modulos, List<Long> categoriaIds, List<Long> tipoIds) {}
+        // @Valid: sem isso, as constraints de ModuloRequest (@NotBlank titulo,
+        // @ValidVideoModulo etc.) nunca rodavam — Bean Validation não desce
+        // automaticamente pra dentro de uma List num record aninhado.
+        @Valid List<ModuloRequest> modulos, List<Long> categoriaIds, List<Long> tipoIds) {}
 
     // ---- Áreas, Categorias e Tipos ----
 
@@ -129,22 +134,29 @@ public class DTOs {
         Integer ordem
     ) {}
 
-    public record ModuloResponse(Long id, String titulo, int ordem, String urlVideo, List<AulaResponse> aulas) {
+    public record ModuloResponse(Long id, String titulo, int ordem, String urlVideo,
+                                  Modulo.TipoVideo tipoVideo, List<AulaResponse> aulas) {
         public static ModuloResponse from(Modulo m) {
-            return new ModuloResponse(m.getId(), m.getTitulo(), m.getOrdem(), m.getUrlVideo(),
+            return new ModuloResponse(m.getId(), m.getTitulo(), m.getOrdem(), m.getUrlVideo(), m.getTipoVideo(),
                     m.getAulas().stream().map(AulaResponse::from).toList());
         }
     }
 
     @Schema(description = "Módulo dentro de CursoRequest.modulos: id presente = atualiza módulo "
             + "existente; id nulo = cria módulo novo")
+    @ValidVideoModulo
     public record ModuloRequest(
         @Schema(description = "Nulo para criar; id de um módulo existente do curso para atualizar") Long id,
         @NotBlank @Size(max = 200) String titulo,
         @NotNull Integer ordem,
-        @Schema(description = "URL do vídeo do módulo (upload via /api/upload/modulo/{id}/video). "
-                + "Nulo num módulo que já tinha vídeo salvo é tratado como remoção explícita: o "
-                + "arquivo é apagado do disco.") @Size(max = 500) String urlVideo) {}
+        @Schema(description = "URL do vídeo do módulo: arquivo (upload via "
+                + "/api/upload/modulo/{id}/video) ou link de YouTube/Vimeo (validado contra "
+                + "tipoVideo). Nulo num módulo que já tinha vídeo salvo é tratado como remoção "
+                + "explícita: o arquivo local, se houver, é apagado do disco.")
+        @Size(max = 500) String urlVideo,
+        @Schema(description = "ARQUIVO = upload local; YOUTUBE/VIMEO = link externo, com "
+                + "urlVideo validada contra o padrão do respectivo serviço; nulo = sem vídeo")
+        Modulo.TipoVideo tipoVideo) {}
 
     public record CursoDetalheResponse(Long id, String titulo, String descricao, Curso.Nivel nivel,
                                        LocalDateTime criadoEm, Long unidadeId, String unidadeNome,

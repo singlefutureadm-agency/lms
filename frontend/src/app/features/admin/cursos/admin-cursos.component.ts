@@ -8,17 +8,19 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { CursoService, Curso, CursoDetalhe, MatriculaDetalhe, Unidade, Area, TipoCurso, AulaInfo } from '../../../core/services/curso.service';
+import { CursoService, Curso, CursoDetalhe, MatriculaDetalhe, Unidade, Area, TipoCurso, AulaInfo, TipoVideoModulo } from '../../../core/services/curso.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { ImageUploadComponent } from '../../../shared/image-upload/image-upload.component';
 import { VideoUploadComponent } from '../../../shared/video-upload/video-upload.component';
+import { VideoEmbedComponent } from '../../../shared/video-embed/video-embed.component';
+import { detectarTipoVideo } from '../../../shared/video-embed/video-embed.util';
 import { mensagemDeErro } from '../../../core/interceptors/error.interceptor';
 
 const FILTRO_DEBOUNCE_MS = 300;
 
 @Component({
     selector: 'app-admin-cursos',
-    imports: [FormsModule, ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatTabsModule, MatPaginatorModule, ImageUploadComponent, VideoUploadComponent],
+    imports: [FormsModule, ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatTabsModule, MatPaginatorModule, ImageUploadComponent, VideoUploadComponent, VideoEmbedComponent],
     templateUrl: './admin-cursos.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrls: ['./admin-cursos.component.scss']
@@ -73,9 +75,19 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
   progressoPorModulo = signal<Map<number, number>>(new Map());
   enviandoVideos = signal(false);
 
-  // Só trava o botão de salvar por upload/remoção de vídeo em andamento —
+  // Link de YouTube/Vimeo é a alternativa ao upload — as duas opções coexistem,
+  // mas só uma fica preenchida por módulo. tipoVideoSelecionado é estado só de
+  // UI (qual dos dois widgets mostrar); o valor "de verdade" é o par
+  // urlVideo/tipoVideo dentro do próprio FormGroup do módulo, que é o que vai
+  // no payload do curso — link não passa por upload, é síncrono com o submit.
+  tipoVideoSelecionado = signal<Map<number, TipoVideoModulo>>(new Map());
+  erroLinkVideo = signal<Map<number, string>>(new Map());
+
+  // Só trava o botão de salvar por upload/remoção de vídeo em andamento, ou
+  // por um link de YouTube/Vimeo com formato inválido ainda não corrigido —
   // selecionar/remover um vídeo por si só não impede salvar.
-  podeSalvar = computed(() => !this.enviandoVideos() && !this.salvando() && !this.form.invalid);
+  podeSalvar = computed(() =>
+    !this.enviandoVideos() && !this.salvando() && !this.form.invalid && this.erroLinkVideo().size === 0);
 
   // Média dos uploads de vídeo em andamento — mostrada no botão salvar
   // enquanto enviandoVideos() é true. null quando não há progresso reportado
@@ -171,7 +183,8 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
       id: [null],
       titulo: ['', [Validators.required]],
       ordem: [novaOrdem, [Validators.required]],
-      urlVideo: [null as string | null]
+      urlVideo: [null as string | null],
+      tipoVideo: [null as TipoVideoModulo | null]
     });
     this.modulosFormArray.push(moduloGroup);
   }
@@ -182,12 +195,15 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     this.modulosFormArray.controls.forEach((control, idx) => {
       control.get('ordem')?.setValue(idx + 1);
     });
-    // videosPendentes/progressoPorModulo são indexados pela posição no
-    // FormArray — remover um módulo do meio desloca os índices seguintes,
-    // então os Maps precisam ser reindexados junto (senão um vídeo pendente
-    // do módulo 3 passaria a ser enviado como se fosse do módulo 2).
+    // videosPendentes/progressoPorModulo/tipoVideoSelecionado/erroLinkVideo são
+    // indexados pela posição no FormArray — remover um módulo do meio desloca
+    // os índices seguintes, então os Maps precisam ser reindexados junto
+    // (senão um vídeo pendente do módulo 3 passaria a ser enviado como se
+    // fosse do módulo 2).
     this.videosPendentes.update(m => this.reindexarAposRemocao(m, index));
     this.progressoPorModulo.update(m => this.reindexarAposRemocao(m, index));
+    this.tipoVideoSelecionado.update(m => this.reindexarAposRemocao(m, index));
+    this.erroLinkVideo.update(m => this.reindexarAposRemocao(m, index));
   }
 
   private reindexarAposRemocao<T>(mapa: Map<number, T>, indiceRemovido: number): Map<number, T> {
@@ -210,6 +226,8 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     this.videosPendentes.set(new Map());
     this.progressoPorModulo.set(new Map());
     this.enviandoVideos.set(false);
+    this.tipoVideoSelecionado.set(new Map());
+    this.erroLinkVideo.set(new Map());
 
     // 2. Reseta os valores básicos do formulário
     this.form.patchValue({
@@ -230,15 +248,19 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
         next: (cursoCompleto) => {
           if (cursoCompleto && cursoCompleto.modulos) {
             const aulas: Record<number, AulaInfo[]> = {};
-            cursoCompleto.modulos.forEach((mod: any) => {
+            const tiposIniciais = new Map<number, TipoVideoModulo>();
+            cursoCompleto.modulos.forEach((mod: any, idx: number) => {
               this.modulosFormArray.push(this.fb.group({
                 id: [mod.id],
                 titulo: [mod.titulo || '', [Validators.required]],
                 ordem: [mod.ordem, [Validators.required]],
-                urlVideo: [mod.urlVideo ?? null]
+                urlVideo: [mod.urlVideo ?? null],
+                tipoVideo: [mod.tipoVideo ?? null]
               }));
+              if (mod.tipoVideo) tiposIniciais.set(idx, mod.tipoVideo);
               aulas[mod.id] = mod.aulas || [];
             });
+            this.tipoVideoSelecionado.set(tiposIniciais);
             this.aulasPorModulo.set(aulas);
           }
         },
@@ -267,12 +289,78 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     this.videosPendentes.set(new Map());
     this.progressoPorModulo.set(new Map());
     this.enviandoVideos.set(false);
+    this.tipoVideoSelecionado.set(new Map());
+    this.erroLinkVideo.set(new Map());
   }
 
   onCapaSelected(file: File) { this.imagemSelecionada.set(file); }
 
   temVideoModulo(idx: number, moduloGroup: AbstractControl): boolean {
     return !!moduloGroup.get('urlVideo')?.value || this.videosPendentes().has(idx);
+  }
+
+  // Estado de exibição do bloco de vídeo do módulo: se já tem um tipo
+  // persistido no próprio FormGroup (veio do backend, ou de um upload/link já
+  // concluído), esse manda; senão cai pro estado só-de-UI de qual aba o
+  // usuário escolheu (nenhuma ainda = mostra os dois botões de escolha).
+  tipoVideoAtivo(idx: number, moduloGroup: AbstractControl): TipoVideoModulo | null {
+    return (moduloGroup.get('tipoVideo')?.value as TipoVideoModulo | null)
+      ?? this.tipoVideoSelecionado().get(idx)
+      ?? null;
+  }
+
+  // As duas opções (arquivo/link) coexistem mas só uma fica preenchida por
+  // módulo: escolher uma limpa qualquer resquício da outra.
+  escolherModoArquivo(idx: number) {
+    const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
+    moduloGroup.patchValue({ urlVideo: null, tipoVideo: null });
+    this.tipoVideoSelecionado.update(m => { const n = new Map(m); n.set(idx, 'ARQUIVO'); return n; });
+    this.erroLinkVideo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+  }
+
+  escolherModoLink(idx: number) {
+    const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
+    moduloGroup.patchValue({ urlVideo: null, tipoVideo: null });
+    this.videosPendentes.update(m => { const n = new Map(m); n.delete(idx); return n; });
+    // YOUTUBE aqui é só um placeholder pra decidir "aba de link está ativa" —
+    // corrigido pro tipo real assim que o usuário digitar um link válido.
+    this.tipoVideoSelecionado.update(m => { const n = new Map(m); n.set(idx, 'YOUTUBE'); return n; });
+  }
+
+  cancelarEscolhaVideo(idx: number) {
+    const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
+    moduloGroup.patchValue({ urlVideo: null, tipoVideo: null });
+    this.tipoVideoSelecionado.update(m => { const n = new Map(m); n.delete(idx); return n; });
+    this.erroLinkVideo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+  }
+
+  // Digitado ao vivo: detecta YouTube/Vimeo com o mesmo padrão do backend
+  // (ModuloRequestVideoValidator) — feedback imediato, sem esperar o submit
+  // do curso pra descobrir que o link é inválido.
+  onLinkVideoChange(idx: number, valorDigitado: string) {
+    const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
+    const url = (valorDigitado || '').trim();
+
+    if (!url) {
+      moduloGroup.patchValue({ urlVideo: null, tipoVideo: null });
+      this.erroLinkVideo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+      return;
+    }
+
+    const tipo = detectarTipoVideo(url);
+    if (!tipo) {
+      moduloGroup.patchValue({ urlVideo: url, tipoVideo: null });
+      this.erroLinkVideo.update(m => {
+        const n = new Map(m);
+        n.set(idx, 'Link inválido. Use uma URL do YouTube (youtube.com/watch?v=... ou youtu.be/...) ou do Vimeo (vimeo.com/...).');
+        return n;
+      });
+      return;
+    }
+
+    moduloGroup.patchValue({ urlVideo: url, tipoVideo: tipo });
+    this.tipoVideoSelecionado.update(m => { const n = new Map(m); n.set(idx, tipo); return n; });
+    this.erroLinkVideo.update(m => { const n = new Map(m); n.delete(idx); return n; });
   }
 
   // Módulo com id real: upload dispara na hora. Módulo novo (id ainda null):
@@ -288,20 +376,31 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Módulo com id real: confirma e remove na hora (DELETE imediato). Módulo
-  // novo: nada foi enviado ao servidor ainda, só tira do Map de pendentes.
+  // Vídeo em arquivo já enviado (existente): confirma e remove na hora
+  // (DELETE imediato). Arquivo ainda pendente (módulo novo): nada foi enviado
+  // ao servidor ainda, só tira do Map de pendentes. Link de YouTube/Vimeo:
+  // nunca passou por upload — é só limpar o FormGroup, some na hora e a
+  // remoção só persiste quando o curso for salvo (igual qualquer outro campo).
   onRemoverVideo(idx: number) {
     const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
     const moduloId = moduloGroup.get('id')?.value;
-    if (!moduloId) {
-      this.videosPendentes.update(m => { const n = new Map(m); n.delete(idx); return n; });
+    const tipoAtual = moduloGroup.get('tipoVideo')?.value as TipoVideoModulo | null;
+
+    if (tipoAtual === 'YOUTUBE' || tipoAtual === 'VIMEO') {
+      this.cancelarEscolhaVideo(idx);
       return;
     }
+    if (!moduloId) {
+      this.videosPendentes.update(m => { const n = new Map(m); n.delete(idx); return n; });
+      this.cancelarEscolhaVideo(idx);
+      return;
+    }
+
     if (!confirm('Remover o vídeo deste módulo?')) return;
     this.enviandoVideos.set(true);
     this.uploadSvc.removerVideoModulo(moduloId).subscribe({
       next: () => {
-        moduloGroup.get('urlVideo')?.setValue(null);
+        this.cancelarEscolhaVideo(idx);
         this.enviandoVideos.set(false);
         this.snack.open('Vídeo removido!', 'OK', { duration: 3000 });
       },
@@ -321,7 +420,7 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
           const pct = Math.round((100 * event.loaded) / event.total);
           this.progressoPorModulo.update(m => { const n = new Map(m); n.set(idx, pct); return n; });
         } else if (event.type === HttpEventType.Response) {
-          moduloGroup.get('urlVideo')?.setValue(event.body?.urlVideo ?? null);
+          moduloGroup.patchValue({ urlVideo: event.body?.urlVideo ?? null, tipoVideo: 'ARQUIVO' });
           this.progressoPorModulo.update(m => { const n = new Map(m); n.delete(idx); return n; });
           this.enviandoVideos.set(false);
           this.snack.open('Vídeo enviado!', 'OK', { duration: 3000 });
@@ -409,7 +508,10 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
   }
 
   salvar() {
-    if (this.form.invalid) return;
+    // A segunda checagem cobre submit via Enter, que não passa pelo [disabled]
+    // do botão — sem ela um link de vídeo malformado ainda em edição escaparia
+    // pro payload do curso.
+    if (this.form.invalid || this.erroLinkVideo().size > 0) return;
     this.salvando.set(true);
     const v = this.form.value;
 

@@ -178,18 +178,71 @@
                           </button>
                         </div>
 
-                        <!-- Vídeo do módulo: upload imediato se o módulo já tem id,
-                             pendente até salvar o curso se ainda for novo -->
+                        <!-- Vídeo do módulo: arquivo (upload imediato se o módulo já tem
+                             id, pendente até salvar o curso se ainda for novo) ou link de
+                             YouTube/Vimeo (síncrono, salvo junto com o resto do módulo).
+                             Só uma das duas opções fica preenchida por módulo. -->
                         <div class="px-3 pb-3">
                           <p class="text-xs font-medium text-texto-suave mb-1.5">Vídeo do módulo (opcional)</p>
-                          <app-video-upload
-                            [currentUrl]="moduloGroup.value.urlVideo"
-                            [temVideo]="temVideoModulo(idx, moduloGroup)"
-                            [loading]="progressoPorModulo().has(idx)"
-                            [progress]="progressoPorModulo().get(idx) ?? null"
-                            (fileSelected)="onVideoSelected(idx, $event)"
-                            (removerVideo)="onRemoverVideo(idx)">
-                          </app-video-upload>
+
+                          @if (!tipoVideoAtivo(idx, moduloGroup)) {
+                            <div class="flex gap-2">
+                              <button type="button" (click)="escolherModoArquivo(idx)"
+                                class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-borda bg-superficie text-texto text-xs font-medium hover:border-marca hover:text-marca cursor-pointer transition-colors">
+                                <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">upload</mat-icon>
+                                Enviar arquivo
+                              </button>
+                              <button type="button" (click)="escolherModoLink(idx)"
+                                class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-borda bg-superficie text-texto text-xs font-medium hover:border-marca hover:text-marca cursor-pointer transition-colors">
+                                <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">link</mat-icon>
+                                Link do YouTube/Vimeo
+                              </button>
+                            </div>
+                          }
+
+                          @if (tipoVideoAtivo(idx, moduloGroup) === 'ARQUIVO') {
+                            <app-video-upload
+                              [currentUrl]="moduloGroup.value.urlVideo"
+                              [temVideo]="temVideoModulo(idx, moduloGroup)"
+                              [loading]="progressoPorModulo().has(idx)"
+                              [progress]="progressoPorModulo().get(idx) ?? null"
+                              (fileSelected)="onVideoSelected(idx, $event)"
+                              (removerVideo)="onRemoverVideo(idx)">
+                            </app-video-upload>
+                            @if (!temVideoModulo(idx, moduloGroup)) {
+                              <button type="button" (click)="cancelarEscolhaVideo(idx)"
+                                class="text-xs text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer mt-1.5 underline p-0">
+                                Cancelar
+                              </button>
+                            }
+                          }
+
+                          @if (tipoVideoAtivo(idx, moduloGroup) === 'YOUTUBE' || tipoVideoAtivo(idx, moduloGroup) === 'VIMEO') {
+                            @if (moduloGroup.value.tipoVideo && moduloGroup.value.urlVideo) {
+                              <div class="relative">
+                                <app-video-embed [url]="moduloGroup.value.urlVideo" [tipo]="moduloGroup.value.tipoVideo">
+                                </app-video-embed>
+                                <button type="button" (click)="onRemoverVideo(idx)"
+                                  class="absolute top-2 right-2 z-10 p-1.5 bg-black/60 hover:bg-erro text-white rounded-lg border-0 cursor-pointer transition-colors flex items-center justify-center">
+                                  <mat-icon style="font-size:18px;height:18px;width:18px;">delete</mat-icon>
+                                </button>
+                              </div>
+                            } @else {
+                              <div>
+                                <input type="url" [value]="moduloGroup.value.urlVideo || ''"
+                                  (input)="onLinkVideoChange(idx, $any($event.target).value)"
+                                  placeholder="https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                                  class="w-full px-4 py-2 bg-superficie rounded-xl border border-borda focus:outline-none focus:border-indigo-500 text-sm text-texto block" />
+                                @if (erroLinkVideo().get(idx)) {
+                                  <p class="text-erro text-xs mt-1.5">{{ erroLinkVideo().get(idx) }}</p>
+                                }
+                                <button type="button" (click)="cancelarEscolhaVideo(idx)"
+                                  class="text-xs text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer mt-1.5 underline p-0">
+                                  Cancelar
+                                </button>
+                              </div>
+                            }
+                          }
                         </div>
 
                         <!-- Aulas do módulo: CRUD próprio, só disponível para módulos já salvos -->
