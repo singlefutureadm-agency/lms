@@ -178,6 +178,20 @@
                           </button>
                         </div>
 
+                        <!-- Vídeo do módulo: upload imediato se o módulo já tem id,
+                             pendente até salvar o curso se ainda for novo -->
+                        <div class="px-3 pb-3">
+                          <p class="text-xs font-medium text-texto-suave mb-1.5">Vídeo do módulo (opcional)</p>
+                          <app-video-upload
+                            [currentUrl]="moduloGroup.value.urlVideo"
+                            [temVideo]="temVideoModulo(idx, moduloGroup)"
+                            [loading]="progressoPorModulo().has(idx)"
+                            [progress]="progressoPorModulo().get(idx) ?? null"
+                            (fileSelected)="onVideoSelected(idx, $event)"
+                            (removerVideo)="onRemoverVideo(idx)">
+                          </app-video-upload>
+                        </div>
+
                         <!-- Aulas do módulo: CRUD próprio, só disponível para módulos já salvos -->
                         @if (!moduloGroup.value.id) {
                           <p class="text-xs text-texto-suave px-3 pb-3">Salve o curso para gerenciar as aulas deste módulo.</p>
@@ -265,11 +279,15 @@
                       class="px-5 py-2.5 rounded-xl text-texto font-medium hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors text-sm">
                       Cancelar
                     </button>
-                    <button type="submit" [disabled]="salvando() || form.invalid"
+                    <button type="submit" [disabled]="!podeSalvar()"
                       class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
-                      <mat-icon class="text-sm" style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ?
-                      'hourglass_empty' : 'save' }}</mat-icon>
-                      <span>{{ salvando() ? 'Salvando...' : 'Salvar Curso' }}</span>
+                      <mat-icon class="text-sm" style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ||
+                      enviandoVideos() ? 'hourglass_empty' : 'save' }}</mat-icon>
+                      <span>
+                        @if (salvando()) { Salvando... }
+                        @else if (enviandoVideos()) { Enviando vídeo{{ progressoVideos() != null ? ' (' + progressoVideos() + '%)' : '...' }} }
+                        @else { Salvar Curso }
+                      </span>
                     </button>
                   </div>
                 </form>

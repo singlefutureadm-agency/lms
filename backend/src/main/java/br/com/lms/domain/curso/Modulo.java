@@ -37,6 +37,9 @@ public class Modulo {
     @Builder.Default
     private Integer ordem = 0;
 
+    @Column(name = "url_video", length = 500)
+    private String urlVideo;
+
     @OneToMany(mappedBy = "modulo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordem ASC")
     @Builder.Default

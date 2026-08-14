@@ -129,9 +129,9 @@ public class DTOs {
         Integer ordem
     ) {}
 
-    public record ModuloResponse(Long id, String titulo, int ordem, List<AulaResponse> aulas) {
+    public record ModuloResponse(Long id, String titulo, int ordem, String urlVideo, List<AulaResponse> aulas) {
         public static ModuloResponse from(Modulo m) {
-            return new ModuloResponse(m.getId(), m.getTitulo(), m.getOrdem(),
+            return new ModuloResponse(m.getId(), m.getTitulo(), m.getOrdem(), m.getUrlVideo(),
                     m.getAulas().stream().map(AulaResponse::from).toList());
         }
     }
@@ -141,7 +141,10 @@ public class DTOs {
     public record ModuloRequest(
         @Schema(description = "Nulo para criar; id de um módulo existente do curso para atualizar") Long id,
         @NotBlank @Size(max = 200) String titulo,
-        @NotNull Integer ordem) {}
+        @NotNull Integer ordem,
+        @Schema(description = "URL do vídeo do módulo (upload via /api/upload/modulo/{id}/video). "
+                + "Nulo num módulo que já tinha vídeo salvo é tratado como remoção explícita: o "
+                + "arquivo é apagado do disco.") @Size(max = 500) String urlVideo) {}
 
     public record CursoDetalheResponse(Long id, String titulo, String descricao, Curso.Nivel nivel,
                                        LocalDateTime criadoEm, Long unidadeId, String unidadeNome,

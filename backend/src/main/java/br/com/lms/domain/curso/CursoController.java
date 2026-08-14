@@ -35,12 +35,12 @@ public class CursoController {
     }
 
     @PostMapping
-    public ResponseEntity<CursoResumoResponse> criar(@Valid @RequestBody CursoRequest request) {
+    public ResponseEntity<CursoDetalheResponse> criar(@Valid @RequestBody CursoRequest request) {
         return ResponseEntity.status(201).body(cursoService.criar(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CursoResumoResponse> atualizar(@PathVariable Long id,
+    public ResponseEntity<CursoDetalheResponse> atualizar(@PathVariable Long id,
             @Valid @RequestBody CursoRequest request) {
         return ResponseEntity.ok(cursoService.atualizar(id, request));
     }

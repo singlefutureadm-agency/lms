@@ -10,6 +10,7 @@ import br.com.lms.domain.matricula.ProgressoAulaRepository;
 import br.com.lms.domain.presenca.PresencaAulaRepository;
 import br.com.lms.domain.regiao.Unidade;
 import br.com.lms.domain.regiao.UnidadeRepository;
+import br.com.lms.domain.upload.UploadService;
 import br.com.lms.dto.DTOs.*;
 import br.com.lms.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class CursoService {
     private final AreaRepository areaRepository;
     private final ProgressoAulaRepository progressoAulaRepository;
     private final PresencaAulaRepository presencaAulaRepository;
+    private final UploadService uploadService;
 
     @Transactional(readOnly = true)
     public Page<CursoResumoResponse> listar(Curso.Nivel nivel, Long unidadeId, String areaSlug,
@@ -83,8 +85,14 @@ public class CursoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Curso", id)));
     }
 
+    // Retorna CursoDetalheResponse (não CursoResumoResponse) de propósito: o
+    // frontend precisa do id real de cada módulo recém-criado logo após o save,
+    // para disparar o upload dos vídeos que ficaram pendentes enquanto o módulo
+    // ainda não existia no banco (ver CursoService#aplicarModulos). A ordem da
+    // lista retornada bate com a ordem enviada no request porque Curso.modulos é
+    // carregada com @OrderBy("ordem ASC") e o frontend usa índice == ordem.
     @Transactional
-    public CursoResumoResponse criar(CursoRequest request) {
+    public CursoDetalheResponse criar(CursoRequest request) {
         Curso curso = Curso.builder()
                 .titulo(request.titulo())
                 .descricao(request.descricao())
@@ -100,11 +108,11 @@ public class CursoService {
         recarregarAssociacoes(curso);
 
         log.info("Curso criado: id={} titulo='{}'", curso.getId(), curso.getTitulo());
-        return CursoResumoResponse.from(curso);
+        return CursoDetalheResponse.from(curso);
     }
 
     @Transactional
-    public CursoResumoResponse atualizar(Long id, CursoRequest request) {
+    public CursoDetalheResponse atualizar(Long id, CursoRequest request) {
         Curso curso = buscar(id);
         curso.setTitulo(request.titulo());
         curso.setDescricao(request.descricao());
@@ -120,7 +128,7 @@ public class CursoService {
         recarregarAssociacoes(curso);
 
         log.info("Curso atualizado: id={}", curso.getId());
-        return CursoResumoResponse.from(curso);
+        return CursoDetalheResponse.from(curso);
     }
 
     @Transactional
@@ -139,9 +147,13 @@ public class CursoService {
     private void aplicarModulos(Curso curso, List<ModuloRequest> modulos) {
         if (modulos == null) return;
         for (ModuloRequest modReq : modulos) {
+            // urlVideo aqui só chega preenchida se o front já tivesse feito upload
+            // pra um módulo existente antes — módulo novo (sem id) nunca tem, porque
+            // o upload exige um moduloId real; ver comentário de #criar.
             curso.getModulos().add(Modulo.builder()
                     .titulo(modReq.titulo())
                     .ordem(modReq.ordem())
+                    .urlVideo(modReq.urlVideo())
                     .curso(curso)
                     .build());
         }
@@ -179,12 +191,18 @@ public class CursoService {
             }
         }
         curso.getModulos().removeAll(removidos);
+        // Módulo removido inteiro leva o vídeo junto: sem isso o arquivo ficava
+        // órfão no disco (a linha em `modulos` some por orphanRemoval, o arquivo não).
+        for (Modulo modulo : removidos) {
+            uploadService.deletar(modulo.getUrlVideo());
+        }
 
         for (ModuloRequest modReq : requests) {
             if (modReq.id() == null) {
                 curso.getModulos().add(Modulo.builder()
                         .titulo(modReq.titulo())
                         .ordem(modReq.ordem())
+                        .urlVideo(modReq.urlVideo())
                         .curso(curso)
                         .build());
                 continue;
@@ -193,8 +211,20 @@ public class CursoService {
                     .filter(m -> modReq.id().equals(m.getId()))
                     .findFirst()
                     .orElseThrow(() -> new ResourceNotFoundException("Módulo", modReq.id()));
+            // Vídeo anterior sendo trocado (ou removido, com urlVideo() == null): a
+            // entidade é atualizada primeiro, o arquivo antigo só é apagado depois —
+            // mesma ordem usada em VideoUploadService, pra não deixar a entidade
+            // apontando pra um arquivo já removido se algo falhar no meio do caminho.
+            // Normalmente o upload/remoção já rolou antes via /api/upload/modulo/**, e
+            // aqui só persiste a urlVideo que o front já tinha atualizado — mas isso
+            // também cobre quem chamar o PUT direto (Swagger etc.) sem passar por lá.
+            String urlVideoAnterior = existente.getUrlVideo();
             existente.setTitulo(modReq.titulo());
             existente.setOrdem(modReq.ordem());
+            existente.setUrlVideo(modReq.urlVideo());
+            if (urlVideoAnterior != null && !urlVideoAnterior.equals(modReq.urlVideo())) {
+                uploadService.deletar(urlVideoAnterior);
+            }
         }
     }
 

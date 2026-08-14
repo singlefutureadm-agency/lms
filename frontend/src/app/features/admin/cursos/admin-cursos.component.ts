@@ -1,22 +1,24 @@
-import { Component, inject, OnInit, OnDestroy, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 
-import { ReactiveFormsModule, FormBuilder, Validators, FormsModule, FormArray } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, AbstractControl, Validators, FormsModule, FormArray } from '@angular/forms';
+import { HttpEvent, HttpEventType } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { CursoService, Curso, MatriculaDetalhe, Unidade, Area, TipoCurso, AulaInfo } from '../../../core/services/curso.service';
+import { CursoService, Curso, CursoDetalhe, MatriculaDetalhe, Unidade, Area, TipoCurso, AulaInfo } from '../../../core/services/curso.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { ImageUploadComponent } from '../../../shared/image-upload/image-upload.component';
+import { VideoUploadComponent } from '../../../shared/video-upload/video-upload.component';
 import { mensagemDeErro } from '../../../core/interceptors/error.interceptor';
 
 const FILTRO_DEBOUNCE_MS = 300;
 
 @Component({
     selector: 'app-admin-cursos',
-    imports: [FormsModule, ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatTabsModule, MatPaginatorModule, ImageUploadComponent],
+    imports: [FormsModule, ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatTabsModule, MatPaginatorModule, ImageUploadComponent, VideoUploadComponent],
     templateUrl: './admin-cursos.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrls: ['./admin-cursos.component.scss']
@@ -62,6 +64,27 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
   moduloAulaAtivo = signal<number | null>(null);
   editandoAula = signal<AulaInfo | null>(null);
   salvandoAula = signal(false);
+
+  // Vídeo de módulo: upload imediato pra módulo já existente (id real), ou
+  // pendente até o curso ser salvo pra módulo novo (id ainda null) — ver
+  // onVideoSelected/salvar. As chaves dos dois Maps são o índice no FormArray,
+  // não o id do módulo (que pra módulo novo ainda não existe).
+  videosPendentes = signal<Map<number, File>>(new Map());
+  progressoPorModulo = signal<Map<number, number>>(new Map());
+  enviandoVideos = signal(false);
+
+  // Só trava o botão de salvar por upload/remoção de vídeo em andamento —
+  // selecionar/remover um vídeo por si só não impede salvar.
+  podeSalvar = computed(() => !this.enviandoVideos() && !this.salvando() && !this.form.invalid);
+
+  // Média dos uploads de vídeo em andamento — mostrada no botão salvar
+  // enquanto enviandoVideos() é true. null quando não há progresso reportado
+  // ainda (ex. remoção de vídeo, ou upload que não emitiu progresso).
+  progressoVideos = computed(() => {
+    const valores = Array.from(this.progressoPorModulo().values());
+    if (valores.length === 0) return null;
+    return Math.round(valores.reduce((a, b) => a + b, 0) / valores.length);
+  });
 
   aulaForm = this.fb.group({
     titulo: ['', [Validators.required]],
@@ -147,7 +170,8 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     const moduloGroup = this.fb.group({
       id: [null],
       titulo: ['', [Validators.required]],
-      ordem: [novaOrdem, [Validators.required]]
+      ordem: [novaOrdem, [Validators.required]],
+      urlVideo: [null as string | null]
     });
     this.modulosFormArray.push(moduloGroup);
   }
@@ -158,6 +182,21 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     this.modulosFormArray.controls.forEach((control, idx) => {
       control.get('ordem')?.setValue(idx + 1);
     });
+    // videosPendentes/progressoPorModulo são indexados pela posição no
+    // FormArray — remover um módulo do meio desloca os índices seguintes,
+    // então os Maps precisam ser reindexados junto (senão um vídeo pendente
+    // do módulo 3 passaria a ser enviado como se fosse do módulo 2).
+    this.videosPendentes.update(m => this.reindexarAposRemocao(m, index));
+    this.progressoPorModulo.update(m => this.reindexarAposRemocao(m, index));
+  }
+
+  private reindexarAposRemocao<T>(mapa: Map<number, T>, indiceRemovido: number): Map<number, T> {
+    const novo = new Map<number, T>();
+    mapa.forEach((valor, idx) => {
+      if (idx === indiceRemovido) return;
+      novo.set(idx > indiceRemovido ? idx - 1 : idx, valor);
+    });
+    return novo;
   }
 
   // Método abrirForm reconfigurado para limpar e popular o FormArray corretamente
@@ -168,6 +207,9 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     while (this.modulosFormArray.length !== 0) {
       this.modulosFormArray.removeAt(0);
     }
+    this.videosPendentes.set(new Map());
+    this.progressoPorModulo.set(new Map());
+    this.enviandoVideos.set(false);
 
     // 2. Reseta os valores básicos do formulário
     this.form.patchValue({
@@ -192,7 +234,8 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
               this.modulosFormArray.push(this.fb.group({
                 id: [mod.id],
                 titulo: [mod.titulo || '', [Validators.required]],
-                ordem: [mod.ordem, [Validators.required]]
+                ordem: [mod.ordem, [Validators.required]],
+                urlVideo: [mod.urlVideo ?? null]
               }));
               aulas[mod.id] = mod.aulas || [];
             });
@@ -221,9 +264,76 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
     this.aulasPorModulo.set({});
     this.moduloAulasExpandido.set(null);
     this.fecharFormAula();
+    this.videosPendentes.set(new Map());
+    this.progressoPorModulo.set(new Map());
+    this.enviandoVideos.set(false);
   }
 
   onCapaSelected(file: File) { this.imagemSelecionada.set(file); }
+
+  temVideoModulo(idx: number, moduloGroup: AbstractControl): boolean {
+    return !!moduloGroup.get('urlVideo')?.value || this.videosPendentes().has(idx);
+  }
+
+  // Módulo com id real: upload dispara na hora. Módulo novo (id ainda null):
+  // só fica pendente, o upload de verdade acontece depois que o curso for
+  // salvo e o módulo ganhar um id (ver salvar()).
+  onVideoSelected(idx: number, file: File) {
+    const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
+    const moduloId = moduloGroup.get('id')?.value;
+    if (moduloId) {
+      this.enviarVideoModulo(idx, moduloId, moduloGroup, file);
+    } else {
+      this.videosPendentes.update(m => { const n = new Map(m); n.set(idx, file); return n; });
+    }
+  }
+
+  // Módulo com id real: confirma e remove na hora (DELETE imediato). Módulo
+  // novo: nada foi enviado ao servidor ainda, só tira do Map de pendentes.
+  onRemoverVideo(idx: number) {
+    const moduloGroup = this.modulosFormArray.at(idx) as FormGroup;
+    const moduloId = moduloGroup.get('id')?.value;
+    if (!moduloId) {
+      this.videosPendentes.update(m => { const n = new Map(m); n.delete(idx); return n; });
+      return;
+    }
+    if (!confirm('Remover o vídeo deste módulo?')) return;
+    this.enviandoVideos.set(true);
+    this.uploadSvc.removerVideoModulo(moduloId).subscribe({
+      next: () => {
+        moduloGroup.get('urlVideo')?.setValue(null);
+        this.enviandoVideos.set(false);
+        this.snack.open('Vídeo removido!', 'OK', { duration: 3000 });
+      },
+      error: (e) => {
+        this.enviandoVideos.set(false);
+        this.snack.open(mensagemDeErro(e, 'Erro ao remover vídeo'), 'Fechar', { duration: 3000 });
+      }
+    });
+  }
+
+  private enviarVideoModulo(idx: number, moduloId: number, moduloGroup: FormGroup, file: File) {
+    this.enviandoVideos.set(true);
+    this.progressoPorModulo.update(m => { const n = new Map(m); n.set(idx, 0); return n; });
+    this.uploadSvc.uploadModuloVideo(moduloId, file).subscribe({
+      next: (event: HttpEvent<{ urlVideo: string }>) => {
+        if (event.type === HttpEventType.UploadProgress && event.total) {
+          const pct = Math.round((100 * event.loaded) / event.total);
+          this.progressoPorModulo.update(m => { const n = new Map(m); n.set(idx, pct); return n; });
+        } else if (event.type === HttpEventType.Response) {
+          moduloGroup.get('urlVideo')?.setValue(event.body?.urlVideo ?? null);
+          this.progressoPorModulo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+          this.enviandoVideos.set(false);
+          this.snack.open('Vídeo enviado!', 'OK', { duration: 3000 });
+        }
+      },
+      error: (e) => {
+        this.progressoPorModulo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+        this.enviandoVideos.set(false);
+        this.snack.open(mensagemDeErro(e, 'Erro ao enviar vídeo'), 'Fechar', { duration: 3000 });
+      }
+    });
+  }
 
   getAulas(moduloId: number): AulaInfo[] {
     return this.aulasPorModulo()[moduloId] || [];
@@ -320,23 +430,70 @@ export class AdminCursosComponent implements OnInit, OnDestroy {
       : this.svc.criarCurso(data);
 
     op.subscribe({
-      next: (curso: Curso) => {
+      next: (curso: CursoDetalhe) => {
         this.salvando.set(false);
+        this.snack.open(isEdicao ? 'Curso atualizado!' : 'Curso criado!', 'OK', { duration: 3000 });
+
+        const finalizar = () => { this.fecharForm(); this.carregarCursos(this.pageIndex()); };
         const imagem = this.imagemSelecionada();
         if (imagem) {
           this.uploadandoCapa.set(true);
           this.uploadSvc.uploadCurso(curso.id, imagem).subscribe({
-            next: () => { this.uploadandoCapa.set(false); this.fecharForm(); this.carregarCursos(this.pageIndex()); },
-            error: () => { this.uploadandoCapa.set(false); this.fecharForm(); this.carregarCursos(this.pageIndex()); }
+            next: () => { this.uploadandoCapa.set(false); this.enviarVideosPendentes(curso, finalizar); },
+            error: () => { this.uploadandoCapa.set(false); this.enviarVideosPendentes(curso, finalizar); }
           });
         } else {
-          this.fecharForm();
-          this.carregarCursos(this.pageIndex());
+          this.enviarVideosPendentes(curso, finalizar);
         }
-        this.snack.open(isEdicao ? 'Curso atualizado!' : 'Curso criado!', 'OK', { duration: 3000 });
       },
       error: () => { this.snack.open('Erro ao salvar curso', 'Fechar', { duration: 3000 }); this.salvando.set(false); }
     });
+  }
+
+  // Módulos novos só ganham id real na resposta do save — é só aqui que dá pra
+  // disparar o upload dos vídeos que ficaram pendentes (ver onVideoSelected).
+  // curso.modulos[idx] bate com o módulo enviado no índice idx do FormArray
+  // porque a lista vem ordenada por "ordem ASC" e ordem == índice+1 (mantido
+  // por adicionarModulo/removerModulo). Sequencial de propósito: cursos
+  // normalmente têm poucos módulos com vídeo pendente por save.
+  private enviarVideosPendentes(curso: CursoDetalhe, aoConcluir: () => void) {
+    const pendentes = Array.from(this.videosPendentes().entries());
+    if (pendentes.length === 0) { aoConcluir(); return; }
+
+    this.enviandoVideos.set(true);
+    let i = 0;
+    const proximo = () => {
+      if (i >= pendentes.length) {
+        this.videosPendentes.set(new Map());
+        this.enviandoVideos.set(false);
+        aoConcluir();
+        return;
+      }
+      const [idx, file] = pendentes[i];
+      i++;
+      const moduloResp = curso.modulos?.[idx];
+      if (!moduloResp) { proximo(); return; }
+
+      this.uploadSvc.uploadModuloVideo(moduloResp.id, file).subscribe({
+        next: (event: HttpEvent<{ urlVideo: string }>) => {
+          if (event.type === HttpEventType.UploadProgress && event.total) {
+            const pct = Math.round((100 * event.loaded) / event.total);
+            this.progressoPorModulo.update(m => { const n = new Map(m); n.set(idx, pct); return n; });
+          } else if (event.type === HttpEventType.Response) {
+            this.progressoPorModulo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+            proximo();
+          }
+        },
+        // O curso já foi salvo — uma falha aqui é só do vídeo daquele módulo,
+        // não desfaz o save. Deixa o usuário tentar de novo depois, editando.
+        error: (e) => {
+          this.snack.open(mensagemDeErro(e, `Erro ao enviar vídeo do módulo ${idx + 1}`), 'Fechar', { duration: 4000 });
+          this.progressoPorModulo.update(m => { const n = new Map(m); n.delete(idx); return n; });
+          proximo();
+        }
+      });
+    };
+    proximo();
   }
 
   excluir(curso: Curso) {

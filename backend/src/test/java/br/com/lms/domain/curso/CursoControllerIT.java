@@ -27,7 +27,7 @@ class CursoControllerIT extends IntegrationTestBase {
         Area area = areaRepository.findAll().get(0);
         CursoRequest request = new CursoRequest(
                 "Curso Com Módulos", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo 1", 1), new ModuloRequest(null, "Módulo 2", 2)),
+                List.of(new ModuloRequest(null, "Módulo 1", 1, null), new ModuloRequest(null, "Módulo 2", 2, null)),
                 null, null);
 
         String resposta = mockMvc.perform(post("/api/cursos")
@@ -54,7 +54,7 @@ class CursoControllerIT extends IntegrationTestBase {
         Area area = areaRepository.findAll().get(0);
         CursoRequest criar = new CursoRequest(
                 "Curso Original", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo Original", 1)), null, null);
+                List.of(new ModuloRequest(null, "Módulo Original", 1, null)), null, null);
 
         String resposta = mockMvc.perform(post("/api/cursos")
                         .header("Authorization", "Bearer " + tokenPara(admin))
@@ -66,7 +66,7 @@ class CursoControllerIT extends IntegrationTestBase {
 
         CursoRequest atualizar = new CursoRequest(
                 "Curso Original", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo Novo A", 1), new ModuloRequest(null, "Módulo Novo B", 2)),
+                List.of(new ModuloRequest(null, "Módulo Novo A", 1, null), new ModuloRequest(null, "Módulo Novo B", 2, null)),
                 null, null);
 
         mockMvc.perform(put("/api/cursos/{id}", cursoId)
@@ -107,7 +107,7 @@ class CursoControllerIT extends IntegrationTestBase {
         List<ModuloRequest> modulosRequest = cursoRecarregado.getModulos().stream()
                 .map(m -> new ModuloRequest(m.getId(),
                         m.getId().equals(moduloComAula.getId()) ? "Módulo 1 - Editado" : m.getTitulo(),
-                        m.getOrdem()))
+                        m.getOrdem(), m.getUrlVideo()))
                 .toList();
         CursoRequest atualizar = new CursoRequest(
                 cursoRecarregado.getTitulo(), cursoRecarregado.getDescricao(), cursoRecarregado.getNivel(),
