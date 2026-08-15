@@ -3,6 +3,7 @@ package br.com.lms.domain.matricula;
 import br.com.lms.IntegrationTestBase;
 import br.com.lms.domain.curso.Curso;
 import br.com.lms.domain.usuario.Usuario;
+import br.com.lms.dto.DTOs.MarcarAulaRequest;
 import br.com.lms.dto.DTOs.MatriculaRequest;
 import br.com.lms.dto.DTOs.NotaRequest;
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,20 @@ class MatriculaControllerIT extends IntegrationTestBase {
                         .content(objectMapper.writeValueAsString(new NotaRequest(new BigDecimal("5.9")))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.aprovado").value(false));
+    }
+
+    @Test
+    void marcarAula_comAulaInexistente_retorna404() throws Exception {
+        Usuario aluno = criarUsuario("Aluno", "aluno6@teste.com", "senha123", Usuario.Role.ALUNO);
+        Curso curso = criarCurso("Curso Marcar Aula");
+        Matricula matricula = matricular(aluno, curso);
+
+        mockMvc.perform(post("/api/matriculas/progresso")
+                        .header("Authorization", "Bearer " + tokenPara(aluno))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MarcarAulaRequest(matricula.getId(), 999999L))))
+                .andExpect(status().isNotFound());
     }
 
     @Test

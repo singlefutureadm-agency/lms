@@ -37,8 +37,20 @@ public class Modulo {
     @Builder.Default
     private Integer ordem = 0;
 
+    @Column(name = "url_video", length = 500)
+    private String urlVideo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_video", length = 20)
+    private TipoVideo tipoVideo;
+
     @OneToMany(mappedBy = "modulo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordem ASC")
     @Builder.Default
     private List<Aula> aulas = new ArrayList<>();
+
+    // ARQUIVO = upload local, gerido por VideoUploadService/UploadService.
+    // YOUTUBE/VIMEO = link externo, validado em ModuloRequest e gravado direto
+    // pelo CursoService — nunca toca em disco.
+    public enum TipoVideo { ARQUIVO, YOUTUBE, VIMEO }
 }

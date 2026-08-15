@@ -24,6 +24,7 @@ import java.util.Map;
 public class UploadController {
 
     private final ImagemUploadService imagemUploadService;
+    private final VideoUploadService videoUploadService;
 
     @PostMapping("/avatar")
     public ResponseEntity<Map<String, String>> uploadAvatar(
@@ -48,5 +49,21 @@ public class UploadController {
             @RequestParam("file") MultipartFile file) throws IOException {
         return ResponseEntity.ok(
                 Map.of("imagemUrl", imagemUploadService.atualizarImagemUnidade(unidadeId, file)));
+    }
+
+    @PostMapping("/modulo/{moduloId}/video")
+    @PreAuthorize("hasAnyRole('ADMIN','PROFESSOR')")
+    public ResponseEntity<Map<String, String>> uploadVideoModulo(
+            @PathVariable Long moduloId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(
+                Map.of("urlVideo", videoUploadService.atualizarVideoModulo(moduloId, file)));
+    }
+
+    @DeleteMapping("/modulo/{moduloId}/video")
+    @PreAuthorize("hasAnyRole('ADMIN','PROFESSOR')")
+    public ResponseEntity<Void> removerVideoModulo(@PathVariable Long moduloId) {
+        videoUploadService.removerVideoModulo(moduloId);
+        return ResponseEntity.noContent().build();
     }
 }

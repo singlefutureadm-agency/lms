@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { autenticar, criarUsuarioComRole, entrarComo, coletarErrosDeConsole, esperarBloqueio, Sessao } from './apoio';
+import { autenticarAdminE2E, criarUsuarioComRole, entrarComo, coletarErrosDeConsole, esperarBloqueio, Sessao } from './apoio';
 
 let admin: Sessao;
 let aluno: Sessao;
 let professor: Sessao;
 
 test.beforeAll(async () => {
-  admin = await autenticar();
+  admin = await autenticarAdminE2E();
   // Usuários reais: forjar a role no localStorage não funciona, porque o
   // AuthService revalida em /api/usuarios/me e o backend é a fonte da verdade.
   aluno = await criarUsuarioComRole('ALUNO');

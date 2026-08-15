@@ -17,4 +17,6 @@ public interface PresencaAulaRepository extends JpaRepository<PresencaAula, Long
 
     @Query("SELECT COUNT(p) FROM PresencaAula p WHERE p.matricula.id = :mid")
     long countTotal(@Param("mid") Long matriculaId);
+
+    boolean existsByAula_IdIn(List<Long> aulaIds);
 }

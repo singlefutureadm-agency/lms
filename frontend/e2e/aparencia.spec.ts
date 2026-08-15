@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { autenticar, entrarComo, coletarErrosDeConsole, Sessao } from './apoio';
+import { autenticarAdminE2E, entrarComo, coletarErrosDeConsole, Sessao } from './apoio';
 
 let sessao: Sessao;
 
 test.beforeAll(async () => {
-  sessao = await autenticar();
+  sessao = await autenticarAdminE2E();
 });
 
 /**

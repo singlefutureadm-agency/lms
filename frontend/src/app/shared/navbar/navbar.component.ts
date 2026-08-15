@@ -5,10 +5,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../core/services/auth.service';
 import { TemaService } from '../../core/services/tema.service';
+import { NotificacaoSinoComponent } from '../notificacao-sino/notificacao-sino.component';
 
 @Component({
     selector: 'app-navbar',
-    imports: [RouterModule, MatIconModule, MatTooltipModule],
+    imports: [RouterModule, MatIconModule, MatTooltipModule, NotificacaoSinoComponent],
     template: `
     <!-- Top bar -->
     <header class="fixed top-0 left-0 right-0 h-16 bg-marca z-50 flex items-center px-4 gap-4 shadow-md">
@@ -43,6 +44,8 @@ import { TemaService } from '../../core/services/tema.service';
             </span>
           }
         </div>
+        <app-notificacao-sino></app-notificacao-sino>
+
         <button (click)="tema.alternarModo()"
           [matTooltip]="tema.modoEfetivo() === 'escuro' ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'"
           [attr.aria-label]="tema.modoEfetivo() === 'escuro' ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'"

@@ -2,12 +2,14 @@ package br.com.lms.domain.curso;
 
 import br.com.lms.IntegrationTestBase;
 import br.com.lms.domain.area.Area;
+import br.com.lms.domain.matricula.Matricula;
 import br.com.lms.domain.usuario.Usuario;
 import br.com.lms.dto.DTOs.CursoRequest;
 import br.com.lms.dto.DTOs.ModuloRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +27,7 @@ class CursoControllerIT extends IntegrationTestBase {
         Area area = areaRepository.findAll().get(0);
         CursoRequest request = new CursoRequest(
                 "Curso Com Módulos", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo 1", 1), new ModuloRequest(null, "Módulo 2", 2)),
+                List.of(new ModuloRequest(null, "Módulo 1", 1, null, null), new ModuloRequest(null, "Módulo 2", 2, null, null)),
                 null, null);
 
         String resposta = mockMvc.perform(post("/api/cursos")
@@ -42,15 +44,17 @@ class CursoControllerIT extends IntegrationTestBase {
     }
 
     @Test
-    void atualizarCurso_comNovosModulos_substituiTodosOsModulosAntigos_replaceAll() throws Exception {
-        // Documenta comportamento atual conhecido do PUT /api/cursos/{id}: os módulos são
-        // sempre limpos e recriados a partir do request (replace-all), não há merge por id.
-        // Isso é debt conhecido do projeto — não é corrigido nesta tarefa, apenas registrado.
+    void atualizarCurso_comModulosSemId_removeAntigosECriaNovos() throws Exception {
+        // Módulos enviados sem id são tratados como novos: o merge incremental cria
+        // os do payload e remove os antigos que não foram referenciados por id. Como
+        // nenhum módulo aqui carrega id, o resultado observável coincide com o do
+        // replace-all antigo — a diferença aparece quando o id é enviado (ver os
+        // testes abaixo, que preservam módulo/aula/progresso existentes).
         Usuario admin = criarUsuario("Admin", "admin2@teste.com", "senha123", Usuario.Role.ADMIN);
         Area area = areaRepository.findAll().get(0);
         CursoRequest criar = new CursoRequest(
                 "Curso Original", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo Original", 1)), null, null);
+                List.of(new ModuloRequest(null, "Módulo Original", 1, null, null)), null, null);
 
         String resposta = mockMvc.perform(post("/api/cursos")
                         .header("Authorization", "Bearer " + tokenPara(admin))
@@ -62,7 +66,7 @@ class CursoControllerIT extends IntegrationTestBase {
 
         CursoRequest atualizar = new CursoRequest(
                 "Curso Original", "desc", Curso.Nivel.BASICO, null, area.getId(),
-                List.of(new ModuloRequest(null, "Módulo Novo A", 1), new ModuloRequest(null, "Módulo Novo B", 2)),
+                List.of(new ModuloRequest(null, "Módulo Novo A", 1, null, null), new ModuloRequest(null, "Módulo Novo B", 2, null, null)),
                 null, null);
 
         mockMvc.perform(put("/api/cursos/{id}", cursoId)
@@ -78,6 +82,81 @@ class CursoControllerIT extends IntegrationTestBase {
     }
 
     @Test
+    void atualizarCurso_moduloComIdExistente_preservaAulasEProgressoDoAluno() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin3@teste.com", "senha123", Usuario.Role.ADMIN);
+        Usuario aluno = criarUsuario("Aluno", "aluno3@teste.com", "senha123", Usuario.Role.ALUNO);
+        Aula aula = criarCursoComAula("Curso Com Progresso");
+        Modulo moduloComAula = aula.getModulo();
+        Curso curso = moduloComAula.getCurso();
+
+        Matricula matricula = matricular(aluno, curso);
+        var progresso = marcarProgresso(matricula, aula);
+
+        // completa o curso com mais 9 módulos, para reproduzir o cenário de 10 módulos
+        // onde só o módulo com a aula com progresso é "editado" (troca de título)
+        List<Modulo> extras = new ArrayList<>();
+        for (int i = 2; i <= 10; i++) {
+            extras.add(Modulo.builder().titulo("Módulo " + i).ordem(i).curso(curso).build());
+        }
+        curso.getModulos().addAll(extras);
+        cursoRepository.save(curso);
+        entityManager.flush();
+        entityManager.clear();
+
+        Curso cursoRecarregado = cursoRepository.findById(curso.getId()).orElseThrow();
+        List<ModuloRequest> modulosRequest = cursoRecarregado.getModulos().stream()
+                .map(m -> new ModuloRequest(m.getId(),
+                        m.getId().equals(moduloComAula.getId()) ? "Módulo 1 - Editado" : m.getTitulo(),
+                        m.getOrdem(), m.getUrlVideo(), m.getTipoVideo()))
+                .toList();
+        CursoRequest atualizar = new CursoRequest(
+                cursoRecarregado.getTitulo(), cursoRecarregado.getDescricao(), cursoRecarregado.getNivel(),
+                null, cursoRecarregado.getArea().getId(), modulosRequest, null, null);
+
+        mockMvc.perform(put("/api/cursos/{id}", curso.getId())
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(atualizar)))
+                .andExpect(status().isOk());
+
+        assertTrue(progressoAulaRepository.findById(progresso.getId()).isPresent(),
+                "progresso_aulas da matrícula existente não deveria ser apagado pela edição do curso");
+
+        Curso cursoAtualizado = cursoRepository.findById(curso.getId()).orElseThrow();
+        assertEquals(10, cursoAtualizado.getModulos().size());
+        Modulo moduloAtualizado = cursoAtualizado.getModulos().stream()
+                .filter(m -> m.getId().equals(moduloComAula.getId()))
+                .findFirst().orElseThrow();
+        assertEquals("Módulo 1 - Editado", moduloAtualizado.getTitulo());
+        assertEquals(1, moduloAtualizado.getAulas().size());
+        assertEquals(aula.getId(), moduloAtualizado.getAulas().get(0).getId());
+    }
+
+    @Test
+    void atualizarCurso_removendoModuloComProgressoAssociado_retorna409SemApagarNada() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin4@teste.com", "senha123", Usuario.Role.ADMIN);
+        Usuario aluno = criarUsuario("Aluno", "aluno4@teste.com", "senha123", Usuario.Role.ALUNO);
+        Aula aula = criarCursoComAula("Curso Bloqueia Remocao");
+        Curso curso = aula.getModulo().getCurso();
+        Matricula matricula = matricular(aluno, curso);
+        marcarProgresso(matricula, aula);
+
+        // payload sem nenhum módulo: tentaria remover o único módulo, que tem aula com progresso
+        CursoRequest atualizar = new CursoRequest(
+                curso.getTitulo(), curso.getDescricao(), curso.getNivel(), null, curso.getArea().getId(),
+                List.of(), null, null);
+
+        mockMvc.perform(put("/api/cursos/{id}", curso.getId())
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(atualizar)))
+                .andExpect(status().isConflict());
+
+        Curso cursoInalterado = cursoRepository.findById(curso.getId()).orElseThrow();
+        assertEquals(1, cursoInalterado.getModulos().size());
+    }
+
+    @Test
     void criarCurso_comoAluno_retorna403() throws Exception {
         Usuario aluno = criarUsuario("Aluno", "aluno@teste.com", "senha123", Usuario.Role.ALUNO);
         Area area = areaRepository.findAll().get(0);
@@ -89,5 +168,69 @@ class CursoControllerIT extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void criarCurso_comModuloLinkYoutubeValido_gravaUrlETipo() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin5@teste.com", "senha123", Usuario.Role.ADMIN);
+        Area area = areaRepository.findAll().get(0);
+        CursoRequest request = new CursoRequest(
+                "Curso Com Youtube", "desc", Curso.Nivel.BASICO, null, area.getId(),
+                List.of(new ModuloRequest(null, "Módulo 1", 1,
+                        "https://www.youtube.com/watch?v=dQw4w9WgXcQ", Modulo.TipoVideo.YOUTUBE)),
+                null, null);
+
+        String resposta = mockMvc.perform(post("/api/cursos")
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        long cursoId = objectMapper.readTree(resposta).get("id").asLong();
+        Modulo modulo = cursoRepository.findById(cursoId).orElseThrow().getModulos().get(0);
+        assertEquals(Modulo.TipoVideo.YOUTUBE, modulo.getTipoVideo());
+        assertEquals("https://www.youtube.com/watch?v=dQw4w9WgXcQ", modulo.getUrlVideo());
+    }
+
+    @Test
+    void criarCurso_comModuloLinkVimeoValido_gravaUrlETipo() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin6@teste.com", "senha123", Usuario.Role.ADMIN);
+        Area area = areaRepository.findAll().get(0);
+        CursoRequest request = new CursoRequest(
+                "Curso Com Vimeo", "desc", Curso.Nivel.BASICO, null, area.getId(),
+                List.of(new ModuloRequest(null, "Módulo 1", 1,
+                        "https://vimeo.com/123456789", Modulo.TipoVideo.VIMEO)),
+                null, null);
+
+        String resposta = mockMvc.perform(post("/api/cursos")
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        long cursoId = objectMapper.readTree(resposta).get("id").asLong();
+        Modulo modulo = cursoRepository.findById(cursoId).orElseThrow().getModulos().get(0);
+        assertEquals(Modulo.TipoVideo.VIMEO, modulo.getTipoVideo());
+    }
+
+    @Test
+    void criarCurso_comModuloLinkYoutubeMalformado_retorna400() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin7@teste.com", "senha123", Usuario.Role.ADMIN);
+        Area area = areaRepository.findAll().get(0);
+        // URL de um site qualquer, não do YouTube — tipoVideo=YOUTUBE exige o padrão
+        // youtube.com/watch?v=... ou youtu.be/...
+        CursoRequest request = new CursoRequest(
+                "Curso Com Link Ruim", "desc", Curso.Nivel.BASICO, null, area.getId(),
+                List.of(new ModuloRequest(null, "Módulo 1", 1,
+                        "https://exemplo.com/video", Modulo.TipoVideo.YOUTUBE)),
+                null, null);
+
+        mockMvc.perform(post("/api/cursos")
+                        .header("Authorization", "Bearer " + tokenPara(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 }

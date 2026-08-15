@@ -23,9 +23,10 @@ public class CursoController {
             @RequestParam(required = false) String areaSlug,
             @RequestParam(required = false) String categoriaSlug,
             @RequestParam(required = false) String tipoSlug,
+            @RequestParam(required = false) String q,
             @PageableDefault(size = 10, sort = "criadoEm") Pageable pageable) {
         return ResponseEntity.ok(
-                cursoService.listar(nivel, unidadeId, areaSlug, categoriaSlug, tipoSlug, pageable));
+                cursoService.listar(nivel, unidadeId, areaSlug, categoriaSlug, tipoSlug, q, pageable));
     }
 
     @GetMapping("/{id}")
@@ -34,12 +35,12 @@ public class CursoController {
     }
 
     @PostMapping
-    public ResponseEntity<CursoResumoResponse> criar(@Valid @RequestBody CursoRequest request) {
+    public ResponseEntity<CursoDetalheResponse> criar(@Valid @RequestBody CursoRequest request) {
         return ResponseEntity.status(201).body(cursoService.criar(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CursoResumoResponse> atualizar(@PathVariable Long id,
+    public ResponseEntity<CursoDetalheResponse> atualizar(@PathVariable Long id,
             @Valid @RequestBody CursoRequest request) {
         return ResponseEntity.ok(cursoService.atualizar(id, request));
     }

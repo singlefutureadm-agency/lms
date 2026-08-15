@@ -53,6 +53,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/areas/lista-cursos-tipo/lista-cursos-tipo.component').then(m => m.ListaCursosTipoComponent)
   },
   {
+    path: 'cursos/busca',
+    loadComponent: () => import('./features/cursos/busca-cursos/busca-cursos.component').then(m => m.BuscaCursosComponent)
+  },
+  {
     path: 'cursos/:id',
     loadComponent: () => import('./features/cursos/detalhe-curso/detalhe-curso.component').then(m => m.DetalheCursoComponent)
   },

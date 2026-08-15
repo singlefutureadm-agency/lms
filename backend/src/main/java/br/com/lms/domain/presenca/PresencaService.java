@@ -1,12 +1,12 @@
 package br.com.lms.domain.presenca;
 
 import br.com.lms.domain.curso.Aula;
+import br.com.lms.domain.curso.AulaRepository;
 import br.com.lms.domain.matricula.Matricula;
 import br.com.lms.domain.matricula.MatriculaRepository;
 import br.com.lms.domain.usuario.Usuario;
 import br.com.lms.dto.DTOs.*;
 import br.com.lms.exception.ResourceNotFoundException;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +26,14 @@ public class PresencaService {
 
     private final PresencaAulaRepository presencaRepository;
     private final MatriculaRepository matriculaRepository;
-    private final EntityManager em;
+    private final AulaRepository aulaRepository;
 
     @Transactional
     public PresencaResponse registrar(PresencaRequest request, Usuario registradoPor) {
         Matricula matricula = matriculaRepository.findById(request.matriculaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Matrícula", request.matriculaId()));
-        Aula aula = em.find(Aula.class, request.aulaId());
-        if (aula == null) throw new ResourceNotFoundException("Aula", request.aulaId());
+        Aula aula = aulaRepository.findById(request.aulaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Aula", request.aulaId()));
 
         PresencaAula presenca = presencaRepository
                 .findByMatriculaIdAndAulaIdAndDataAula(request.matriculaId(), request.aulaId(), request.dataAula())

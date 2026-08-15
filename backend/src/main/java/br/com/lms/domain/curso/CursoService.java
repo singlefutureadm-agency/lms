@@ -6,19 +6,24 @@ import br.com.lms.domain.area.Categoria;
 import br.com.lms.domain.area.CategoriaRepository;
 import br.com.lms.domain.area.Tipo;
 import br.com.lms.domain.area.TipoRepository;
+import br.com.lms.domain.matricula.ProgressoAulaRepository;
+import br.com.lms.domain.presenca.PresencaAulaRepository;
 import br.com.lms.domain.regiao.Unidade;
 import br.com.lms.domain.regiao.UnidadeRepository;
+import br.com.lms.domain.upload.UploadService;
 import br.com.lms.dto.DTOs.*;
 import br.com.lms.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Regras de negócio de curso.
@@ -41,12 +46,22 @@ public class CursoService {
     private final CategoriaRepository categoriaRepository;
     private final TipoRepository tipoRepository;
     private final AreaRepository areaRepository;
+    private final ProgressoAulaRepository progressoAulaRepository;
+    private final PresencaAulaRepository presencaAulaRepository;
+    private final UploadService uploadService;
 
     @Transactional(readOnly = true)
     public Page<CursoResumoResponse> listar(Curso.Nivel nivel, Long unidadeId, String areaSlug,
-                                            String categoriaSlug, String tipoSlug, Pageable pageable) {
+                                            String categoriaSlug, String tipoSlug, String q, Pageable pageable) {
         Page<Curso> page;
-        if (tipoSlug != null) {
+        if (q != null && !q.isBlank()) {
+            // Sem Sort: a ordenação já vem por relevância (ts_rank) na própria query
+            // nativa — repassar o Sort do Pageable a injetaria como identificador
+            // SQL cru (ver CursoRepository.buscarPorTexto).
+            Pageable semOrdenacao = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+            page = cursoRepository.buscarPorTexto(q.trim(), nivel != null ? nivel.name() : null,
+                    unidadeId, areaSlug, categoriaSlug, tipoSlug, semOrdenacao);
+        } else if (tipoSlug != null) {
             page = cursoRepository.findByTipoSlug(tipoSlug, pageable);
         } else if (categoriaSlug != null && areaSlug != null) {
             page = cursoRepository.findByCategoriaSlug(areaSlug, categoriaSlug, pageable);
@@ -70,8 +85,14 @@ public class CursoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Curso", id)));
     }
 
+    // Retorna CursoDetalheResponse (não CursoResumoResponse) de propósito: o
+    // frontend precisa do id real de cada módulo recém-criado logo após o save,
+    // para disparar o upload dos vídeos que ficaram pendentes enquanto o módulo
+    // ainda não existia no banco (ver CursoService#aplicarModulos). A ordem da
+    // lista retornada bate com a ordem enviada no request porque Curso.modulos é
+    // carregada com @OrderBy("ordem ASC") e o frontend usa índice == ordem.
     @Transactional
-    public CursoResumoResponse criar(CursoRequest request) {
+    public CursoDetalheResponse criar(CursoRequest request) {
         Curso curso = Curso.builder()
                 .titulo(request.titulo())
                 .descricao(request.descricao())
@@ -87,11 +108,11 @@ public class CursoService {
         recarregarAssociacoes(curso);
 
         log.info("Curso criado: id={} titulo='{}'", curso.getId(), curso.getTitulo());
-        return CursoResumoResponse.from(curso);
+        return CursoDetalheResponse.from(curso);
     }
 
     @Transactional
-    public CursoResumoResponse atualizar(Long id, CursoRequest request) {
+    public CursoDetalheResponse atualizar(Long id, CursoRequest request) {
         Curso curso = buscar(id);
         curso.setTitulo(request.titulo());
         curso.setDescricao(request.descricao());
@@ -99,9 +120,7 @@ public class CursoService {
         curso.setUnidade(resolverUnidade(request.unidadeId()));
         curso.setArea(resolverArea(request.areaId()));
 
-        // Estratégia "replace all": os módulos enviados substituem os existentes.
-        curso.getModulos().clear();
-        aplicarModulos(curso, request.modulos());
+        mergeModulos(curso, request.modulos());
 
         curso = cursoRepository.save(curso);
         sincronizarCategorias(curso, request.categoriaIds());
@@ -109,7 +128,7 @@ public class CursoService {
         recarregarAssociacoes(curso);
 
         log.info("Curso atualizado: id={}", curso.getId());
-        return CursoResumoResponse.from(curso);
+        return CursoDetalheResponse.from(curso);
     }
 
     @Transactional
@@ -128,11 +147,95 @@ public class CursoService {
     private void aplicarModulos(Curso curso, List<ModuloRequest> modulos) {
         if (modulos == null) return;
         for (ModuloRequest modReq : modulos) {
+            // urlVideo aqui só chega preenchida se o front já tivesse feito upload
+            // pra um módulo existente antes — módulo novo (sem id) nunca tem, porque
+            // o upload exige um moduloId real; ver comentário de #criar.
             curso.getModulos().add(Modulo.builder()
                     .titulo(modReq.titulo())
                     .ordem(modReq.ordem())
+                    .urlVideo(modReq.urlVideo())
+                    .tipoVideo(modReq.tipoVideo())
                     .curso(curso)
                     .build());
+        }
+    }
+
+    /**
+     * Merge incremental: módulo com {@code id} existente é atualizado no lugar
+     * (preservando suas aulas e o progresso/presença de alunos já registrados
+     * nelas); sem {@code id} é criado; o que sai do payload é removido, a menos
+     * que alguma de suas aulas já tenha progresso ou presença registrados — nesse
+     * caso a edição é rejeitada em vez de apagar histórico do aluno.
+     */
+    private void mergeModulos(Curso curso, List<ModuloRequest> requestsRecebidos) {
+        List<ModuloRequest> requests = requestsRecebidos != null ? requestsRecebidos : List.of();
+        // Snapshot dos módulos já persistidos, tirado antes de qualquer adição: um
+        // Modulo novo (sem id ainda) é "igual" a outro módulo novo pelo equals()
+        // gerado sobre o id (ambos null), então remoção/contains não pode rodar
+        // depois de módulos transitórios entrarem na coleção.
+        List<Modulo> existentes = List.copyOf(curso.getModulos());
+
+        List<Long> idsMantidos = requests.stream()
+                .map(ModuloRequest::id)
+                .filter(Objects::nonNull)
+                .toList();
+        List<Modulo> removidos = existentes.stream()
+                .filter(m -> !idsMantidos.contains(m.getId()))
+                .toList();
+        for (Modulo modulo : removidos) {
+            List<Long> aulaIds = modulo.getAulas().stream().map(Aula::getId).toList();
+            if (!aulaIds.isEmpty() && (progressoAulaRepository.existsByAula_IdIn(aulaIds)
+                    || presencaAulaRepository.existsByAula_IdIn(aulaIds))) {
+                throw new IllegalStateException(
+                        "O módulo '" + modulo.getTitulo() + "' não pode ser removido: "
+                        + "há progresso ou presença de aluno registrados em suas aulas");
+            }
+        }
+        curso.getModulos().removeAll(removidos);
+        // Módulo removido inteiro leva o vídeo junto: sem isso o arquivo ficava
+        // órfão no disco (a linha em `modulos` some por orphanRemoval, o arquivo
+        // não). Só existe arquivo físico pra apagar quando é ARQUIVO — YOUTUBE/
+        // VIMEO é só um link, não tem nada em /uploads pra remover.
+        for (Modulo modulo : removidos) {
+            if (modulo.getTipoVideo() == Modulo.TipoVideo.ARQUIVO) {
+                uploadService.deletar(modulo.getUrlVideo());
+            }
+        }
+
+        for (ModuloRequest modReq : requests) {
+            if (modReq.id() == null) {
+                curso.getModulos().add(Modulo.builder()
+                        .titulo(modReq.titulo())
+                        .ordem(modReq.ordem())
+                        .urlVideo(modReq.urlVideo())
+                        .tipoVideo(modReq.tipoVideo())
+                        .curso(curso)
+                        .build());
+                continue;
+            }
+            Modulo existente = existentes.stream()
+                    .filter(m -> modReq.id().equals(m.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Módulo", modReq.id()));
+            // Vídeo anterior sendo trocado (ou removido, com urlVideo() == null): a
+            // entidade é atualizada primeiro, o arquivo antigo só é apagado depois —
+            // mesma ordem usada em VideoUploadService, pra não deixar a entidade
+            // apontando pra um arquivo já removido se algo falhar no meio do caminho.
+            // Normalmente o upload/remoção/link já rolou antes via /api/upload/modulo/**
+            // ou direto no request (YOUTUBE/VIMEO), e aqui só persiste o que o front já
+            // tinha atualizado — mas isso também cobre quem chamar o PUT direto (Swagger
+            // etc.) sem passar por lá. Só apaga arquivo físico se o vídeo ANTERIOR era
+            // ARQUIVO — trocar um link de YouTube por outro vídeo não tem nada em
+            // /uploads pra remover.
+            String urlVideoAnterior = existente.getUrlVideo();
+            boolean anteriorEraArquivo = existente.getTipoVideo() == Modulo.TipoVideo.ARQUIVO;
+            existente.setTitulo(modReq.titulo());
+            existente.setOrdem(modReq.ordem());
+            existente.setUrlVideo(modReq.urlVideo());
+            existente.setTipoVideo(modReq.tipoVideo());
+            if (anteriorEraArquivo && urlVideoAnterior != null && !urlVideoAnterior.equals(modReq.urlVideo())) {
+                uploadService.deletar(urlVideoAnterior);
+            }
         }
     }
 

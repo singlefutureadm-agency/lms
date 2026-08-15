@@ -5,13 +5,21 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
       <div>
         <h1 class="text-2xl font-bold text-texto">Gerenciar Cursos</h1>
-        <p class="text-texto-suave text-sm mt-1">{{ cursos().length }} curso(s) ativo(s)</p>
+        <p class="text-texto-suave text-sm mt-1">{{ totalCursos() }} curso(s) ativo(s)</p>
       </div>
       <button (click)="abrirForm()"
         class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors shadow-xs border-0 cursor-pointer">
         <mat-icon>add</mat-icon>
         Novo Curso
       </button>
+    </div>
+
+    <!-- Busca -->
+    <div class="mb-6 max-w-md relative">
+      <mat-icon class="absolute left-3.5 top-1/2 -translate-y-1/2 text-texto-suave" style="font-size:20px;height:20px;width:20px;line-height:20px;">search</mat-icon>
+      <input type="text" [value]="filtro()" (input)="onFiltroChange($any($event.target).value)"
+        placeholder="Buscar por título ou palavra-chave..."
+        class="lms-input w-full pl-10" />
     </div>
 
     <!-- Formulário criar/editar -->
@@ -147,24 +155,176 @@
                   <!-- Inputs Dinâmicos dos Módulos -->
                   <div [formArrayName]="'modulos'" class="space-y-3 mb-6 block w-full">
                     @for (moduloGroup of modulosFormArray.controls; track moduloGroup; let idx = $index) {
-                      <div [formGroupName]="idx"
-                        class="flex items-center gap-3 p-3 bg-fundo rounded-xl border border-borda block w-full">
-                        <span
-                          class="w-7 h-7 bg-superficie text-texto-suave rounded-lg text-xs font-bold flex items-center justify-center border border-borda shrink-0">
-                          {{ idx + 1 }}
-                        </span>
-                        <div class="flex-1 min-w-0">
-                          <input type="text" formControlName="titulo" placeholder="Ex: Fundamentos da Linguagem"
-                            class="w-full px-4 py-2 bg-superficie rounded-xl border border-borda focus:outline-none focus:border-indigo-500 text-sm text-texto block" />
+                      <div class="bg-fundo rounded-xl border border-borda block w-full overflow-hidden">
+                        <div [formGroupName]="idx" class="flex items-center gap-3 p-3">
+                          <span
+                            class="w-7 h-7 bg-superficie text-texto-suave rounded-lg text-xs font-bold flex items-center justify-center border border-borda shrink-0">
+                            {{ idx + 1 }}
+                          </span>
+                          <div class="flex-1 min-w-0">
+                            <input type="text" formControlName="titulo" placeholder="Ex: Fundamentos da Linguagem"
+                              class="w-full px-4 py-2 bg-superficie rounded-xl border border-borda focus:outline-none focus:border-indigo-500 text-sm text-texto block" />
                           </div>
+                          @if (moduloGroup.value.id) {
+                            <button type="button" (click)="toggleAulasModulo(moduloGroup.value.id)"
+                              class="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium border border-marca-suave bg-marca-suave text-marca-escura hover:bg-marca-suave transition-colors cursor-pointer shrink-0">
+                              <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">play_lesson</mat-icon>
+                              {{ getAulas(moduloGroup.value.id).length }} aula(s)
+                            </button>
+                          }
                           <button type="button" (click)="removerModulo(idx)"
                             class="p-2 text-texto-suave hover:text-erro hover:bg-erro/10 rounded-xl border-0 cursor-pointer bg-transparent transition-colors shrink-0 flex items-center justify-center">
                             <mat-icon style="font-size:20px;height:20px;width:20px;">delete</mat-icon>
                           </button>
                         </div>
-                      }
-                    </div>
+
+                        <!-- Vídeo do módulo: arquivo (upload imediato se o módulo já tem
+                             id, pendente até salvar o curso se ainda for novo) ou link de
+                             YouTube/Vimeo (síncrono, salvo junto com o resto do módulo).
+                             Só uma das duas opções fica preenchida por módulo. -->
+                        <div class="px-3 pb-3">
+                          <p class="text-xs font-medium text-texto-suave mb-1.5">Vídeo do módulo (opcional)</p>
+
+                          @if (!tipoVideoAtivo(idx, moduloGroup)) {
+                            <div class="flex gap-2">
+                              <button type="button" (click)="escolherModoArquivo(idx)"
+                                class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-borda bg-superficie text-texto text-xs font-medium hover:border-marca hover:text-marca cursor-pointer transition-colors">
+                                <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">upload</mat-icon>
+                                Enviar arquivo
+                              </button>
+                              <button type="button" (click)="escolherModoLink(idx)"
+                                class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-borda bg-superficie text-texto text-xs font-medium hover:border-marca hover:text-marca cursor-pointer transition-colors">
+                                <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">link</mat-icon>
+                                Link do YouTube/Vimeo
+                              </button>
+                            </div>
+                          }
+
+                          @if (tipoVideoAtivo(idx, moduloGroup) === 'ARQUIVO') {
+                            <app-video-upload
+                              [currentUrl]="moduloGroup.value.urlVideo"
+                              [temVideo]="temVideoModulo(idx, moduloGroup)"
+                              [loading]="progressoPorModulo().has(idx)"
+                              [progress]="progressoPorModulo().get(idx) ?? null"
+                              (fileSelected)="onVideoSelected(idx, $event)"
+                              (removerVideo)="onRemoverVideo(idx)">
+                            </app-video-upload>
+                            @if (!temVideoModulo(idx, moduloGroup)) {
+                              <button type="button" (click)="cancelarEscolhaVideo(idx)"
+                                class="text-xs text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer mt-1.5 underline p-0">
+                                Cancelar
+                              </button>
+                            }
+                          }
+
+                          @if (tipoVideoAtivo(idx, moduloGroup) === 'YOUTUBE' || tipoVideoAtivo(idx, moduloGroup) === 'VIMEO') {
+                            @if (moduloGroup.value.tipoVideo && moduloGroup.value.urlVideo) {
+                              <div class="relative">
+                                <app-video-embed [url]="moduloGroup.value.urlVideo" [tipo]="moduloGroup.value.tipoVideo">
+                                </app-video-embed>
+                                <button type="button" (click)="onRemoverVideo(idx)"
+                                  class="absolute top-2 right-2 z-10 p-1.5 bg-black/60 hover:bg-erro text-white rounded-lg border-0 cursor-pointer transition-colors flex items-center justify-center">
+                                  <mat-icon style="font-size:18px;height:18px;width:18px;">delete</mat-icon>
+                                </button>
+                              </div>
+                            } @else {
+                              <div>
+                                <input type="url" [value]="moduloGroup.value.urlVideo || ''"
+                                  (input)="onLinkVideoChange(idx, $any($event.target).value)"
+                                  placeholder="https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                                  class="w-full px-4 py-2 bg-superficie rounded-xl border border-borda focus:outline-none focus:border-indigo-500 text-sm text-texto block" />
+                                @if (erroLinkVideo().get(idx)) {
+                                  <p class="text-erro text-xs mt-1.5">{{ erroLinkVideo().get(idx) }}</p>
+                                }
+                                <button type="button" (click)="cancelarEscolhaVideo(idx)"
+                                  class="text-xs text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer mt-1.5 underline p-0">
+                                  Cancelar
+                                </button>
+                              </div>
+                            }
+                          }
+                        </div>
+
+                        <!-- Aulas do módulo: CRUD próprio, só disponível para módulos já salvos -->
+                        @if (!moduloGroup.value.id) {
+                          <p class="text-xs text-texto-suave px-3 pb-3">Salve o curso para gerenciar as aulas deste módulo.</p>
+                        }
+                        @if (moduloGroup.value.id && moduloAulasExpandido() === moduloGroup.value.id) {
+                          <div class="border-t border-borda bg-superficie px-3 py-3">
+                            @for (aula of getAulas(moduloGroup.value.id); track aula.id) {
+                              <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-fundo">
+                                <span
+                                  class="w-6 h-6 bg-fundo text-texto-suave rounded-md text-xs font-bold flex items-center justify-center border border-borda shrink-0">
+                                  {{ aula.ordem }}
+                                </span>
+                                <div class="flex-1 min-w-0">
+                                  <p class="text-sm font-medium text-texto truncate">{{ aula.titulo }}</p>
+                                  <p class="text-xs text-texto-suave">{{ aula.duracaoMin }} min
+                                    @if (aula.urlVideo) { · vídeo }
+                                  </p>
+                                </div>
+                                <button type="button" (click)="abrirFormAula(moduloGroup.value.id, aula)"
+                                  class="p-1.5 text-texto-suave hover:text-marca hover:bg-marca-suave rounded-lg border-0 bg-transparent cursor-pointer shrink-0">
+                                  <mat-icon style="font-size:18px;height:18px;width:18px;">edit</mat-icon>
+                                </button>
+                                <button type="button" (click)="excluirAula(moduloGroup.value.id, aula)"
+                                  class="p-1.5 text-texto-suave hover:text-erro hover:bg-erro/10 rounded-lg border-0 bg-transparent cursor-pointer shrink-0">
+                                  <mat-icon style="font-size:18px;height:18px;width:18px;">delete</mat-icon>
+                                </button>
+                              </div>
+                            }
+                            @if (getAulas(moduloGroup.value.id).length === 0 && moduloAulaAtivo() !== moduloGroup.value.id) {
+                              <p class="text-xs text-texto-suave py-2">Nenhuma aula cadastrada neste módulo.</p>
+                            }
+
+                            <!-- Form de aula (criar/editar) -->
+                            @if (moduloAulaAtivo() === moduloGroup.value.id) {
+                              <form [formGroup]="aulaForm" (ngSubmit)="salvarAula(moduloGroup.value.id)"
+                                class="bg-fundo rounded-lg border border-marca-suave p-3 mt-2">
+                                <div class="grid grid-cols-2 gap-2 mb-2">
+                                  <div class="col-span-2 lms-field">
+                                    <label class="lms-label">Título <span class="required">*</span></label>
+                                    <input type="text" class="lms-input" formControlName="titulo" placeholder="Ex: Introdução" />
+                                  </div>
+                                  <div class="col-span-2 lms-field">
+                                    <label class="lms-label">URL do vídeo</label>
+                                    <input type="text" class="lms-input" formControlName="urlVideo" placeholder="https://..." />
+                                  </div>
+                                  <div class="lms-field">
+                                    <label class="lms-label">Duração (min)</label>
+                                    <input type="number" min="0" class="lms-input" formControlName="duracaoMin" />
+                                  </div>
+                                  <div class="lms-field">
+                                    <label class="lms-label">Ordem</label>
+                                    <input type="number" min="1" class="lms-input" formControlName="ordem" />
+                                  </div>
+                                </div>
+                                <div class="flex justify-end gap-2">
+                                  <button type="button" (click)="fecharFormAula()"
+                                    class="px-3 py-1.5 rounded-lg text-texto text-xs font-medium hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer">
+                                    Cancelar
+                                  </button>
+                                  <button type="submit" [disabled]="salvandoAula() || aulaForm.invalid"
+                                    class="flex items-center gap-1 bg-marca text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer">
+                                    <mat-icon style="font-size:14px;height:14px;width:14px;">save</mat-icon>
+                                    {{ salvandoAula() ? 'Salvando...' : (editandoAula() ? 'Salvar' : 'Adicionar') }}
+                                  </button>
+                                </div>
+                              </form>
+                            }
+                            @if (moduloAulaAtivo() !== moduloGroup.value.id) {
+                              <button type="button" (click)="abrirFormAula(moduloGroup.value.id)"
+                                class="flex items-center gap-1 text-xs text-marca hover:text-marca-escura bg-transparent border-0 cursor-pointer mt-2 font-medium">
+                                <mat-icon style="font-size:16px;height:16px;width:16px;">add</mat-icon>
+                                Adicionar aula
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
                   </div>
+                </div>
                   <!--  -->
                   <!-- Botões inferiores de envio -->
                   <div class="flex justify-end gap-3 pt-4 border-t border-gray-50">
@@ -172,11 +332,15 @@
                       class="px-5 py-2.5 rounded-xl text-texto font-medium hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors text-sm">
                       Cancelar
                     </button>
-                    <button type="submit" [disabled]="salvando() || form.invalid"
+                    <button type="submit" [disabled]="!podeSalvar()"
                       class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
-                      <mat-icon class="text-sm" style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ?
-                      'hourglass_empty' : 'save' }}</mat-icon>
-                      <span>{{ salvando() ? 'Salvando...' : 'Salvar Curso' }}</span>
+                      <mat-icon class="text-sm" style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ||
+                      enviandoVideos() ? 'hourglass_empty' : 'save' }}</mat-icon>
+                      <span>
+                        @if (salvando()) { Salvando... }
+                        @else if (enviandoVideos()) { Enviando vídeo{{ progressoVideos() != null ? ' (' + progressoVideos() + '%)' : '...' }} }
+                        @else { Salvar Curso }
+                      </span>
                     </button>
                   </div>
                 </form>
@@ -334,6 +498,20 @@
                     </div>
                   }
                 </div>
+
+                <!-- Paginação -->
+                @if (totalCursos() > pageSize()) {
+                  <div class="mt-6 flex justify-center">
+                    <mat-paginator
+                      [length]="totalCursos()"
+                      [pageSize]="pageSize()"
+                      [pageIndex]="pageIndex()"
+                      [pageSizeOptions]="[10, 25, 50]"
+                      (page)="onPage($event)"
+                      showFirstLastButtons>
+                    </mat-paginator>
+                  </div>
+                }
               }
             </div>
           </div>

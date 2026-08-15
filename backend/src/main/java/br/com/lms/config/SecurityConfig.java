@@ -6,12 +6,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -37,9 +39,11 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsServiceImpl userDetailsService;
+    private final Environment environment;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        boolean swaggerPublico = !environment.matchesProfiles("prod");
         return http
             .csrf(CsrfConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfig()))
@@ -48,11 +52,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Auth — público
                 .requestMatchers("/api/auth/**").permitAll()
-                // Health check e documentação da API — públicos.
+                // Health check — público.
                 // Os demais endpoints do actuator seguem exigindo autenticação
                 // (só health e info estão expostos, ver application.properties).
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                // Swagger/OpenAPI — público em dev; em prod exige ADMIN autenticado,
+                // pra não expor o mapa completo de endpoints sem autenticação nenhuma.
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                    .access((authentication, context) -> new AuthorizationDecision(
+                            swaggerPublico || context.getRequest().isUserInRole("ADMIN")))
                 // Arquivos de upload — leitura pública
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 // Endpoints de upload — requerem autenticação (roles verificados via @PreAuthorize)

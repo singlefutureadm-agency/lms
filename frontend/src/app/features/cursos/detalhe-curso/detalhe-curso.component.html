@@ -148,6 +148,17 @@
                       </mat-panel-description>
                     </mat-expansion-panel-header>
                     <div class="px-6 pb-4">
+                      @if (modulo.urlVideo) {
+                        <div class="mb-4">
+                          @if (modulo.tipoVideo === 'ARQUIVO') {
+                            <video [src]="modulo.urlVideo" controls
+                              class="w-full aspect-video rounded-xl bg-black"></video>
+                          }
+                          @if (modulo.tipoVideo === 'YOUTUBE' || modulo.tipoVideo === 'VIMEO') {
+                            <app-video-embed [url]="modulo.urlVideo" [tipo]="modulo.tipoVideo"></app-video-embed>
+                          }
+                        </div>
+                      }
                       <ul class="space-y-2">
                         @for (aula of modulo.aulas; track aula.id) {
                           <li

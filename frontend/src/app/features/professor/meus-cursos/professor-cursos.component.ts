@@ -7,18 +7,22 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatExpansionModule } from '@angular/material/expansion';
-import { CursoService, Curso, ConteudoAula } from '../../../core/services/curso.service';
+import { CursoService, Curso, ConteudoAula, TipoVideoModulo } from '../../../core/services/curso.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { VideoEmbedComponent } from '../../../shared/video-embed/video-embed.component';
 import { mensagemDeErro } from '../../../core/interceptors/error.interceptor';
 
 interface CursoDetalhe {
   id: number; titulo: string; descricao: string; nivel: string; criadoEm: string;
-  modulos: { id: number; titulo: string; ordem: number; aulas: { id: number; titulo: string; urlVideo: string; duracaoMin: number; ordem: number }[] }[];
+  modulos: {
+    id: number; titulo: string; ordem: number; urlVideo: string | null; tipoVideo: TipoVideoModulo | null;
+    aulas: { id: number; titulo: string; urlVideo: string; duracaoMin: number; ordem: number }[];
+  }[];
 }
 
 @Component({
     selector: 'app-professor-cursos',
-    imports: [RouterModule, ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatExpansionModule],
+    imports: [RouterModule, ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatExpansionModule, VideoEmbedComponent],
     templateUrl: './professor-cursos.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrls: ['./professor-cursos.component.scss']

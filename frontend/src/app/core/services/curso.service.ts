@@ -6,8 +6,9 @@ export interface CategoriaInfo { id: number; nome: string; slug: string; areaNom
 export interface TipoCurso { id: number; nome: string; slug: string; }
 export interface Area { id: number; nome: string; slug: string; categorias: CategoriaInfo[]; }
 export interface Curso { id: number; titulo: string; descricao: string; nivel: string; criadoEm: string; unidadeId: number | null; unidadeNome: string | null; areaId: number | null; areaNome: string | null; imagemUrl: string | null; categorias: CategoriaInfo[]; tipos: TipoCurso[]; }
-export interface AulaInfo { id: number; titulo: string; urlVideo: string | null; duracaoMin: number; ordem: number; }
-export interface ModuloInfo { id: number; titulo: string; ordem: number; aulas: AulaInfo[]; }
+export interface AulaInfo { id: number; moduloId: number; titulo: string; urlVideo: string | null; duracaoMin: number; ordem: number; }
+export type TipoVideoModulo = 'ARQUIVO' | 'YOUTUBE' | 'VIMEO';
+export interface ModuloInfo { id: number; titulo: string; ordem: number; urlVideo: string | null; tipoVideo: TipoVideoModulo | null; aulas: AulaInfo[]; }
 export interface CursoDetalhe extends Curso { modulos: ModuloInfo[]; }
 /**
  * Shape do PagedModel do Spring Data. O backend passou a serializar Page com
@@ -86,10 +87,18 @@ export class CursoService {
     return this.http.get<Page<Curso>>(`${environment.apiUrl}/cursos`, { params });
   }
 
-  listarCursos(page = 0, nivel?: string, unidadeId?: number) {
+  /** Listagem paginada usada pelo painel admin — não carrega tudo de uma vez. */
+  listarCursosAdmin(page = 0, size = 10, q?: string) {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (q) params = params.set('q', q);
+    return this.http.get<Page<Curso>>(`${environment.apiUrl}/cursos`, { params });
+  }
+
+  listarCursos(page = 0, nivel?: string, unidadeId?: number, q?: string) {
     let params = new HttpParams().set('page', page).set('size', 10);
     if (nivel) params = params.set('nivel', nivel);
     if (unidadeId) params = params.set('unidadeId', unidadeId);
+    if (q) params = params.set('q', q);
     return this.http.get<Page<Curso>>(`${environment.apiUrl}/cursos`, { params });
   }
 
@@ -97,12 +106,16 @@ export class CursoService {
     return this.http.get<CursoDetalhe>(`${environment.apiUrl}/cursos/${id}`);
   }
 
-  criarCurso(data: { titulo: string; descricao: string; nivel: string; unidadeId: number | null; areaId: number; categoriaIds?: number[]; tipoIds?: number[] }) {
-    return this.http.post<Curso>(`${environment.apiUrl}/cursos`, data);
+  // Retorno é CursoDetalhe (não Curso): o backend passou a incluir os módulos
+  // com id real na resposta de criar/atualizar, necessário para disparar o
+  // upload dos vídeos que ficaram pendentes de módulos ainda sem id no momento
+  // do submit (ver AdminCursosComponent.salvar).
+  criarCurso(data: { titulo: string; descricao: string; nivel: string; unidadeId: number | null; areaId: number; modulos?: any[]; categoriaIds?: number[]; tipoIds?: number[] }) {
+    return this.http.post<CursoDetalhe>(`${environment.apiUrl}/cursos`, data);
   }
 
-  atualizarCurso(id: number, data: { titulo: string; descricao: string; nivel: string; unidadeId: number | null; areaId: number; categoriaIds?: number[]; tipoIds?: number[] }) {
-    return this.http.put<Curso>(`${environment.apiUrl}/cursos/${id}`, data);
+  atualizarCurso(id: number, data: { titulo: string; descricao: string; nivel: string; unidadeId: number | null; areaId: number; modulos?: any[]; categoriaIds?: number[]; tipoIds?: number[] }) {
+    return this.http.put<CursoDetalhe>(`${environment.apiUrl}/cursos/${id}`, data);
   }
 
   deletarCurso(id: number) {
@@ -210,6 +223,19 @@ export class CursoService {
 
   desvincularProfessorCurso(professorId: number, cursoId: number) {
     return this.http.delete(`${environment.apiUrl}/professores/${professorId}/cursos/${cursoId}`);
+  }
+
+  // --- Aulas ---
+  criarAula(data: { moduloId: number; titulo: string; urlVideo: string | null; duracaoMin: number; ordem: number }) {
+    return this.http.post<AulaInfo>(`${environment.apiUrl}/aulas`, data);
+  }
+
+  atualizarAula(id: number, data: { titulo: string; urlVideo: string | null; duracaoMin: number; ordem: number }) {
+    return this.http.put<AulaInfo>(`${environment.apiUrl}/aulas/${id}`, data);
+  }
+
+  deletarAula(id: number) {
+    return this.http.delete(`${environment.apiUrl}/aulas/${id}`);
   }
 
   // --- Conteúdo das Aulas ---

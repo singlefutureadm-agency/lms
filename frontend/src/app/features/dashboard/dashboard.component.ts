@@ -78,7 +78,12 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  irParaCursos(_nivel?: string) {
+  irParaCursos(nivel?: string) {
+    const termo = this.pesquisa().trim();
+    if (!nivel && termo) {
+      this.router.navigate(['/cursos/busca'], { queryParams: { q: termo } });
+      return;
+    }
     this.router.navigate(['/cursos/areas']);
   }
 

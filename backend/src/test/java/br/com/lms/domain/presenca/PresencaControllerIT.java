@@ -2,6 +2,7 @@ package br.com.lms.domain.presenca;
 
 import br.com.lms.IntegrationTestBase;
 import br.com.lms.domain.curso.Aula;
+import br.com.lms.domain.curso.Curso;
 import br.com.lms.domain.matricula.Matricula;
 import br.com.lms.domain.usuario.Usuario;
 import br.com.lms.dto.DTOs.PresencaRequest;
@@ -49,5 +50,20 @@ class PresencaControllerIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.presente").value(false));
 
         assertEquals(1, presencaAulaRepository.findByMatriculaId(matricula.getId()).size());
+    }
+
+    @Test
+    void registrarPresenca_comAulaInexistente_retorna404() throws Exception {
+        Usuario professor = criarUsuario("Prof", "prof.pres404@teste.com", "senha123", Usuario.Role.PROFESSOR);
+        Usuario aluno = criarUsuario("Aluno", "aluno.pres404@teste.com", "senha123", Usuario.Role.ALUNO);
+        Curso curso = criarCurso("Curso Presença 404");
+        Matricula matricula = matricular(aluno, curso);
+
+        mockMvc.perform(post("/api/presenca")
+                        .header("Authorization", "Bearer " + tokenPara(professor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PresencaRequest(matricula.getId(), 999999L, true, LocalDate.now()))))
+                .andExpect(status().isNotFound());
     }
 }

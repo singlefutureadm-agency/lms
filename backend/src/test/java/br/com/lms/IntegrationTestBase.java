@@ -2,11 +2,15 @@ package br.com.lms;
 
 import br.com.lms.domain.area.AreaRepository;
 import br.com.lms.domain.curso.Aula;
+import br.com.lms.domain.curso.AulaRepository;
 import br.com.lms.domain.curso.Curso;
 import br.com.lms.domain.curso.CursoRepository;
 import br.com.lms.domain.curso.Modulo;
+import br.com.lms.domain.curso.ModuloRepository;
 import br.com.lms.domain.matricula.Matricula;
 import br.com.lms.domain.matricula.MatriculaRepository;
+import br.com.lms.domain.matricula.ProgressoAula;
+import br.com.lms.domain.matricula.ProgressoAulaRepository;
 import br.com.lms.domain.presenca.PresencaAulaRepository;
 import br.com.lms.domain.usuario.Usuario;
 import br.com.lms.domain.usuario.UsuarioRepository;
@@ -94,10 +98,14 @@ public abstract class IntegrationTestBase {
     @Autowired protected CursoRepository cursoRepository;
     @Autowired protected MatriculaRepository matriculaRepository;
     @Autowired protected PresencaAulaRepository presencaAulaRepository;
+    @Autowired protected ProgressoAulaRepository progressoAulaRepository;
     @Autowired protected br.com.lms.domain.professor.ProfessorCursoRepository professorCursoRepository;
     @Autowired protected br.com.lms.domain.regiao.RegiaoRepository regiaoRepository;
     @Autowired protected br.com.lms.domain.regiao.UnidadeRepository unidadeRepository;
     @Autowired protected br.com.lms.domain.conteudo.ConteudoAulaRepository conteudoAulaRepository;
+    @Autowired protected AulaRepository aulaRepository;
+    @Autowired protected ModuloRepository moduloRepository;
+    @Autowired protected br.com.lms.domain.notificacao.NotificacaoRepository notificacaoRepository;
     @Autowired protected PasswordEncoder passwordEncoder;
     @Autowired protected JwtTokenProvider tokenProvider;
 
@@ -144,8 +152,46 @@ public abstract class IntegrationTestBase {
         return curso.getModulos().get(0).getAulas().get(0);
     }
 
+    protected Modulo criarModulo(String tituloCurso) {
+        var area = areaRepository.findAll().get(0);
+        Curso curso = Curso.builder()
+                .titulo(tituloCurso)
+                .descricao("Descrição de teste")
+                .nivel(Curso.Nivel.BASICO)
+                .area(area)
+                .build();
+        Modulo modulo = Modulo.builder().titulo("Módulo 1").ordem(1).curso(curso).build();
+        curso.getModulos().add(modulo);
+        curso = cursoRepository.save(curso);
+        return curso.getModulos().get(0);
+    }
+
     protected Matricula matricular(Usuario usuario, Curso curso) {
         Matricula matricula = Matricula.builder().usuario(usuario).curso(curso).build();
         return matriculaRepository.save(matricula);
+    }
+
+    protected ProgressoAula marcarProgresso(Matricula matricula, Aula aula) {
+        ProgressoAula progresso = ProgressoAula.builder()
+                .matricula(matricula).aula(aula)
+                .concluida(true).concluidoEm(java.time.LocalDateTime.now())
+                .build();
+        return progressoAulaRepository.save(progresso);
+    }
+
+    protected br.com.lms.domain.presenca.PresencaAula registrarPresenca(Matricula matricula, Aula aula) {
+        br.com.lms.domain.presenca.PresencaAula presenca = br.com.lms.domain.presenca.PresencaAula.builder()
+                .matricula(matricula).aula(aula)
+                .presente(true).dataAula(java.time.LocalDate.now())
+                .build();
+        return presencaAulaRepository.save(presenca);
+    }
+
+    protected br.com.lms.domain.notificacao.Notificacao criarNotificacao(Usuario usuario,
+            br.com.lms.domain.notificacao.Notificacao.Tipo tipo, String mensagem, boolean lida) {
+        var notificacao = br.com.lms.domain.notificacao.Notificacao.builder()
+                .usuario(usuario).tipo(tipo).mensagem(mensagem).lida(lida)
+                .build();
+        return notificacaoRepository.save(notificacao);
     }
 }

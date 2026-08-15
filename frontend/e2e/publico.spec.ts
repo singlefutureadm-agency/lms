@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { coletarErrosDeConsole } from './apoio';
+import { coletarErrosDeConsole, autenticarAdminE2E, E2E_ADMIN } from './apoio';
 
 /**
  * Navegação pública: as telas que qualquer visitante alcança sem login.
@@ -56,13 +56,19 @@ test.describe('navegação pública', () => {
 });
 
 test.describe('autenticação pela interface', () => {
+  test.beforeAll(async () => {
+    // Garante que o admin de teste exista antes do login pela UI — este describe
+    // não depende da ordem de execução de autenticado.spec.ts.
+    await autenticarAdminE2E();
+  });
+
   test('login com credenciais válidas leva ao dashboard, sem erro de console', async ({ page }) => {
     const erros = coletarErrosDeConsole(page);
 
     await page.goto('/login');
 
-    await page.getByRole('textbox').first().fill('miguel@lms.com');
-    await page.locator('input[type="password"]').first().fill('123456');
+    await page.getByRole('textbox').first().fill(E2E_ADMIN.email);
+    await page.locator('input[type="password"]').first().fill(E2E_ADMIN.senha);
     await page.locator('form').first().locator('button[type="submit"]').click();
 
     await expect(page).toHaveURL(/\/(dashboard|admin\/dashboard)/, { timeout: 15_000 });
@@ -76,7 +82,7 @@ test.describe('autenticação pela interface', () => {
   test('credenciais inválidas mostram a mensagem vinda do ProblemDetail', async ({ page }) => {
     await page.goto('/login');
 
-    await page.getByRole('textbox').first().fill('miguel@lms.com');
+    await page.getByRole('textbox').first().fill(E2E_ADMIN.email);
     await page.locator('input[type="password"]').first().fill('senha-errada');
     await page.locator('form').first().locator('button[type="submit"]').click();
 

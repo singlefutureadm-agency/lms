@@ -221,8 +221,8 @@ Widget global standalone (WCAG 2.1 AA/AAA), persistido em `localStorage`: 5 nív
 
 ## 5. Débitos técnicos e pontos de atenção conhecidos
 
-- Estratégia de atualização de módulos no `PUT /api/cursos` é "replace all" (limpa e recria), não merge incremental.
 - Arquivo de crash dump da JVM (`hs_err_pid*.log`) presente na raiz — candidato a limpeza.
+- **Não existe endpoint para criar/editar/excluir `Aula`** (só `Modulo` é gerenciável via `PUT /api/cursos`, e `ConteudoAula`/presença/nota via seus próprios controllers). A tabela `aulas` nunca é populada por nenhum fluxo da aplicação (nem seed, nem API) — hoje só existiria uma linha ali se alguém inserisse via SQL direto. `MatriculaService.marcarAula` e `PresencaService` referenciam `aulaId` sem validar que a aula existe, então também dependem desse gap indiretamente.
 
 **Resolvidos na migração de 2026-08-09** (ver §6):
 
@@ -233,6 +233,10 @@ Widget global standalone (WCAG 2.1 AA/AAA), persistido em `localStorage`: 5 nív
 - ~~Upload apagava a imagem antiga antes de gravar a nova~~ → ordem invertida.
 - ~~`PATCH /api/usuarios/{id}/role` devolvia 200 com role inválida~~ → `RoleUpdateRequest` validado (400).
 - ~~`POST /api/professores/{id}/cursos` lançava NPE sem `cursoId`~~ → `VincularCursoRequest` com `@NotNull`.
+
+**Resolvido em 2026-08-10:**
+
+- ~~Estratégia de atualização de módulos no `PUT /api/cursos` era "replace all" (limpa e recria), não merge incremental~~ → `CursoService.mergeModulos`: módulo com `id` existente é atualizado no lugar (preservando aulas e progresso/presença já registrados nelas); sem `id` é criado; o que sai do payload é removido, a menos que alguma de suas aulas já tenha progresso/presença associados — nesse caso a edição é rejeitada com 409 em vez de apagar histórico do aluno. Investigação de FK: `aulas.modulo_id`/`modulos.curso_id` têm `ON DELETE CASCADE`, mas `progresso_aulas.aula_id`/`presencas_aula.aula_id` **não têm** — então o replace-all antigo não apagava progresso silenciosamente, ele falhava com 409 (violação de integridade) sempre que havia progresso registrado. Na prática isso nunca disparou em produção porque não existe fluxo que crie linhas em `aulas` (ver item acima).
 
 ---
 

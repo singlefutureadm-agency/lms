@@ -51,6 +51,11 @@ export class HomeComponent implements OnInit {
   }
 
   irParaCursos(nivel?: string) {
+    const termo = this.pesquisa().trim();
+    if (!nivel && termo) {
+      this.router.navigate(['/cursos/busca'], { queryParams: { q: termo } });
+      return;
+    }
     const queryParams = nivel ? { nivel } : {};
     this.router.navigate(['/cursos'], { queryParams });
   }

@@ -1,0 +1,43 @@
+<button [matMenuTriggerFor]="menu" (click)="onAbrirMenu()"
+  [matBadge]="svc.contagemNaoLidas()" [matBadgeHidden]="svc.contagemNaoLidas() === 0"
+  matBadgeColor="warn" matBadgeSize="small"
+  class="p-2 rounded-lg hover:bg-white/10 transition-colors border-0 bg-transparent cursor-pointer text-white/80"
+  aria-label="Notificações">
+  <mat-icon>notifications</mat-icon>
+</button>
+
+<mat-menu #menu="matMenu">
+  <div class="w-80 max-w-[90vw]" (click)="$event.stopPropagation()">
+    <div class="px-4 py-3 border-b border-borda">
+      <span class="font-semibold text-texto text-sm">Notificações</span>
+    </div>
+
+    @if (svc.carregando()) {
+      <div class="flex justify-center py-8">
+        <mat-spinner diameter="28"></mat-spinner>
+      </div>
+    }
+
+    @if (!svc.carregando() && svc.notificacoes().length === 0) {
+      <p class="text-center text-sm text-texto-suave py-8 px-4">Nenhuma notificação por aqui.</p>
+    }
+
+    @if (!svc.carregando() && svc.notificacoes().length > 0) {
+      <div class="max-h-96 overflow-y-auto">
+        @for (n of svc.notificacoes(); track n.id) {
+          <button type="button" (click)="marcarLida(n)"
+            class="flex items-start gap-3 w-full text-left px-4 py-3 border-0 cursor-pointer bg-transparent hover:bg-superficie-2 transition-colors"
+            [class.bg-marca-suave]="!n.lida">
+            <mat-icon class="text-marca shrink-0" style="font-size:20px;height:20px;width:20px;margin-top:2px;">
+              {{ tipoIcon(n.tipo) }}
+            </mat-icon>
+            <div class="min-w-0">
+              <p class="text-sm text-texto" [class.font-semibold]="!n.lida">{{ n.mensagem }}</p>
+              <p class="text-xs text-texto-suave mt-0.5">{{ n.criadoEm | date:'dd/MM/yyyy HH:mm' }}</p>
+            </div>
+          </button>
+        }
+      </div>
+    }
+  </div>
+</mat-menu>

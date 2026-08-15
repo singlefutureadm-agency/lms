@@ -21,11 +21,13 @@ frontend/dist/
 frontend/.angular/
 frontend/*.log
 frontend/.env
+frontend/e2e/.env.e2e
 
 # Sistema
 .DS_Store
 Thumbs.db
 *.log
+hs_err_pid*.log
 
 # Scripts e screenshots de sessão de testes (somente raiz)
 /ss_*.js
