@@ -7,11 +7,12 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../../core/services/auth.service';
 import { CursoService, CursoDetalhe } from '../../../core/services/curso.service';
+import { VideoEmbedComponent } from '../../../shared/video-embed/video-embed.component';
 import { mensagemDeErro } from '../../../core/interceptors/error.interceptor';
 
 @Component({
     selector: 'app-detalhe-curso',
-    imports: [CommonModule, NgClass, RouterModule, MatSnackBarModule, MatProgressSpinnerModule, MatExpansionModule, MatIconModule],
+    imports: [CommonModule, NgClass, RouterModule, MatSnackBarModule, MatProgressSpinnerModule, MatExpansionModule, MatIconModule, VideoEmbedComponent],
     templateUrl: './detalhe-curso.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrls: ['./detalhe-curso.component.scss']

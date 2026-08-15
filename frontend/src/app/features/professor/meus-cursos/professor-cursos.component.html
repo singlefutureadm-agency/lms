@@ -85,6 +85,18 @@
                           <p class="font-semibold text-texto text-sm">{{ modulo.titulo }}</p>
                           <span class="text-xs text-texto-suave">({{ modulo.aulas.length }} aula(s))</span>
                         </div>
+                        <!-- Vídeo do módulo -->
+                        @if (modulo.urlVideo) {
+                          <div class="px-5 pt-1 pb-3 bg-fundo">
+                            @if (modulo.tipoVideo === 'ARQUIVO') {
+                              <video [src]="modulo.urlVideo" controls
+                                class="w-full aspect-video rounded-xl bg-black"></video>
+                            }
+                            @if (modulo.tipoVideo === 'YOUTUBE' || modulo.tipoVideo === 'VIMEO') {
+                              <app-video-embed [url]="modulo.urlVideo" [tipo]="modulo.tipoVideo"></app-video-embed>
+                            }
+                          </div>
+                        }
                         <!-- Aulas do módulo -->
                         @for (aula of modulo.aulas; track aula.id) {
                           <div
