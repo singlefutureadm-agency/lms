@@ -63,6 +63,11 @@ public class SecurityConfig {
                             swaggerPublico || context.getRequest().isUserInRole("ADMIN")))
                 // Arquivos de upload — leitura pública
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+                // Identidade visual (white-label) — leitura pública, porque a
+                // tela de login já mostra o nome e o logotipo do cliente, antes
+                // de existir sessão. Escrita só ADMIN (também via @PreAuthorize).
+                .requestMatchers(HttpMethod.GET, "/api/marca").permitAll()
+                .requestMatchers("/api/marca/**").hasRole("ADMIN")
                 // Endpoints de upload — requerem autenticação (roles verificados via @PreAuthorize)
                 .requestMatchers("/api/upload/**").authenticated()
                 // Cursos — leitura pública, escrita ADMIN

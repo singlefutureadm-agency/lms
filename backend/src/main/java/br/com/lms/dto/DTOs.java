@@ -7,6 +7,7 @@ import br.com.lms.domain.conteudo.ConteudoAula;
 import br.com.lms.domain.curso.Aula;
 import br.com.lms.domain.curso.Curso;
 import br.com.lms.domain.curso.Modulo;
+import br.com.lms.domain.marca.ConfiguracaoMarca;
 import br.com.lms.domain.matricula.Matricula;
 import br.com.lms.domain.notificacao.Notificacao;
 import br.com.lms.domain.presenca.PresencaAula;
@@ -337,4 +338,20 @@ public class DTOs {
 
     @Schema(description = "Contagem de notificações não lidas, para alimentar o badge sem paginar tudo")
     public record ContagemNaoLidasResponse(long total) {}
+
+    // ---- Marca (white-label) ----
+
+    @Schema(description = "Identidade visual da instalação (GET /api/marca — público)")
+    public record MarcaResponse(String nome, String assinatura, String logoUrl, String logoInversoUrl) {
+        public static MarcaResponse from(ConfiguracaoMarca m) {
+            return new MarcaResponse(m.getNome(), m.getAssinatura(), m.getLogoUrl(), m.getLogoInversoUrl());
+        }
+    }
+
+    @Schema(description = "Edição da identidade visual (PUT /api/marca — ADMIN). "
+            + "Os logotipos NÃO entram aqui: são multipart, em /api/marca/logo")
+    public record MarcaRequest(
+        @NotBlank @Size(max = 60) String nome,
+        @Size(max = 90) String assinatura
+    ) {}
 }

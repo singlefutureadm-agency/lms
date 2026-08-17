@@ -26,10 +26,13 @@ public class CacheConfig {
     public static final String AREAS = "areas";
     public static final String TIPOS = "tipos";
     public static final String REGIOES = "regioes";
+    /** Identidade visual: uma linha só, lida em toda abertura da aplicação
+     *  (inclusive na tela de login, antes de autenticar). */
+    public static final String MARCA = "marca";
 
     @Bean
     public CaffeineCacheManager cacheManager() {
-        CaffeineCacheManager manager = new CaffeineCacheManager(AREAS, TIPOS, REGIOES);
+        CaffeineCacheManager manager = new CaffeineCacheManager(AREAS, TIPOS, REGIOES, MARCA);
         manager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(500)
                 // Sem isto o Micrometer só consegue expor 'cache.size'; com as
