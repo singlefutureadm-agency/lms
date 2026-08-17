@@ -5,10 +5,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/services/auth.service';
 import { CursoService, Area, TipoCurso, Regiao, Unidade } from '../../core/services/curso.service';
+import { LogoMarcaComponent } from '../logo-marca/logo-marca.component';
 
 @Component({
     selector: 'app-public-nav',
-    imports: [RouterModule, MatIconModule],
+    imports: [RouterModule, MatIconModule, LogoMarcaComponent],
     template: `
     <!-- ══════════════════════════════════════════════════════ Header -->
     <header class="fixed top-0 left-0 right-0 bg-superficie z-50 shadow-xs">
@@ -16,11 +17,8 @@ import { CursoService, Area, TipoCurso, Regiao, Unidade } from '../../core/servi
       <div class="h-16 max-w-screen-xl mx-auto px-4 lg:px-8 flex items-center gap-6">
     
         <!-- Logo -->
-        <a routerLink="/home" class="flex items-center gap-2.5 no-underline shrink-0">
-          <div class="w-8 h-8 bg-marca rounded-lg flex items-center justify-center">
-            <mat-icon class="text-white" style="font-size:18px;height:18px;width:18px">school</mat-icon>
-          </div>
-          <span class="text-xl font-bold text-texto whitespace-nowrap">Senac <span class="text-destaque">LMS</span></span>
+        <a routerLink="/home" class="flex items-center no-underline shrink-0">
+          <app-logo-marca sobre="claro" tamanho="sm"></app-logo-marca>
         </a>
     
         <!-- Desktop nav — visible apenas em ≥ lg (1024px) -->
@@ -38,7 +36,7 @@ import { CursoService, Area, TipoCurso, Regiao, Unidade } from '../../core/servi
             class="shrink-0 whitespace-nowrap flex items-center gap-0.5 px-3 py-2 rounded-lg text-sm
                    font-medium transition-colors cursor-pointer border-0 bg-transparent"
             [class]="activeDropdown() === 'cursos'
-              ? 'text-marca bg-blue-50 font-semibold'
+              ? 'text-marca bg-marca-suave font-semibold'
               : 'text-texto hover:text-marca hover:bg-marca-suave'">
             Cursos
             <mat-icon class="transition-transform duration-200 text-base"
@@ -51,7 +49,7 @@ import { CursoService, Area, TipoCurso, Regiao, Unidade } from '../../core/servi
             class="shrink-0 whitespace-nowrap flex items-center gap-0.5 px-3 py-2 rounded-lg text-sm
                    font-medium transition-colors cursor-pointer border-0 bg-transparent"
             [class]="activeDropdown() === 'unidades'
-              ? 'text-marca bg-blue-50 font-semibold'
+              ? 'text-marca bg-marca-suave font-semibold'
               : 'text-texto hover:text-marca hover:bg-marca-suave'">
             Unidades
             <mat-icon class="transition-transform duration-200 text-base"
@@ -157,74 +155,34 @@ import { CursoService, Area, TipoCurso, Regiao, Unidade } from '../../core/servi
                 Carregando unidades...
               </div>
             }
-            <!-- Estado: grid completo com unidades agrupadas por região -->
-            @if (!loadingUnidades() && capitalUnidades().length > 0) {
-              <div class="grid grid-cols-4 gap-x-8">
-                <!-- Capital — ocupa 2 colunas, grid interno de 2 -->
-                <div class="col-span-2 pr-8 border-r border-borda">
-                  <p class="text-texto font-bold text-xs uppercase tracking-widest mb-3">Capital</p>
-                  <div class="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                    @for (u of capitalUnidades(); track u) {
-                      <a
-                        [routerLink]="['/unidades', u.slug]"
-                        (click)="activeDropdown.set(null)"
-                        class="text-marca text-sm hover:underline no-underline truncate">
-                        {{ u.nome }}
-                      </a>
-                    }
+            <!-- Estado: uma coluna por região, na ordem em que a API as devolve.
+                 Antes eram quatro blocos escritos à mão ("Capital", "Grande SP e
+                 Litoral", "Interior", "Centros Universitários") — a estrutura
+                 regional de um cliente específico embutida no template. Um
+                 cliente com outras regiões via um menu vazio. -->
+            @if (!loadingUnidades() && grupos().length > 0) {
+              <div class="grid gap-x-8 gap-y-6"
+                [style.grid-template-columns]="'repeat(auto-fit, minmax(180px, 1fr))'">
+                @for (grupo of grupos(); track grupo.regiao) {
+                  <div>
+                    <p class="text-texto font-bold text-xs uppercase tracking-widest mb-3">{{ grupo.regiao }}</p>
+                    <ul class="space-y-1.5 overflow-y-auto pr-1" style="max-height:260px">
+                      @for (u of grupo.unidades; track u.id) {
+                        <li>
+                          <a [routerLink]="['/unidades', u.slug]"
+                            (click)="activeDropdown.set(null)"
+                            class="text-marca text-sm hover:underline no-underline block truncate">
+                            {{ u.nome }}
+                          </a>
+                        </li>
+                      }
+                    </ul>
                   </div>
-                </div>
-                <!-- Grande SP e Litoral — 1 coluna -->
-                <div class="pr-8 border-r border-borda">
-                  <p class="text-texto font-bold text-xs uppercase tracking-widest mb-3">Grande SP e Litoral</p>
-                  <ul class="space-y-1.5">
-                    @for (u of grandeSPUnidades(); track u) {
-                      <li>
-                        <a [routerLink]="['/unidades', u.slug]"
-                          (click)="activeDropdown.set(null)"
-                          class="text-marca text-sm hover:underline no-underline block">
-                          {{ u.nome }}
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                </div>
-                <!-- Interior — 1 coluna, lista com scroll para 35 itens -->
-                <div>
-                  <p class="text-texto font-bold text-xs uppercase tracking-widest mb-3">Interior</p>
-                  <ul class="space-y-1.5 overflow-y-auto pr-1" style="max-height:260px">
-                    @for (u of interiorUnidades(); track u) {
-                      <li>
-                        <a [routerLink]="['/unidades', u.slug]"
-                          (click)="activeDropdown.set(null)"
-                          class="text-marca text-sm hover:underline no-underline block">
-                          {{ u.nome }}
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                </div>
+                }
               </div>
-              <!-- Centros Universitários — faixa abaixo do grid -->
-              @if (centrosUnivUnidades().length > 0) {
-                <div
-                  class="mt-5 pt-4 border-t border-borda flex flex-wrap items-center gap-x-8 gap-y-2">
-                  <p class="text-texto font-bold text-xs uppercase tracking-widest shrink-0">
-                    Centros Universitários
-                  </p>
-                  @for (u of centrosUnivUnidades(); track u) {
-                    <a
-                      [routerLink]="['/unidades', u.slug]"
-                      (click)="activeDropdown.set(null)"
-                      class="text-marca text-sm hover:underline no-underline">
-                      {{ u.nome }}
-                    </a>
-                  }
-                </div>
-              }
             }
             <!-- Fallback: resumo por regiões (enquanto unidades carregam ou API indisponível) -->
-            @if (!loadingUnidades() && capitalUnidades().length === 0) {
+            @if (!loadingUnidades() && grupos().length === 0) {
               <p class="text-texto font-bold text-xs uppercase tracking-widest mb-4">Regiões</p>
               <ul class="grid grid-cols-2 gap-x-16 gap-y-2.5">
                 @for (regiao of regioes(); track regiao) {
@@ -406,27 +364,33 @@ export class PublicNavComponent implements OnInit {
   todasUnidades = signal<Unidade[]>([]);
   loadingUnidades = signal(true);
 
-  private readonly REGIAO_ORDER = ['Capital', 'Grande São Paulo e Litoral', 'Interior', 'Centros Universitários'];
+  /**
+   * Unidades agrupadas por região, na ordem em que `/api/regioes` as devolve —
+   * a mesma que o administrador vê no painel. Regiões que a listagem não
+   * conhecer entram depois, para nenhuma unidade sumir do menu.
+   *
+   * Substitui a antiga lista fixa de quatro regiões nomeadas no código, que só
+   * funcionava para a base de dados de um cliente.
+   */
+  grupos = computed<{ regiao: string; unidades: Unidade[] }[]>(() => {
+    const todas = this.todasUnidades();
+    if (!todas.length) return [];
 
-  capitalUnidades   = computed(() => this.todasUnidades().filter(u => u.regiaoNome === 'Capital'));
-  grandeSPUnidades  = computed(() => this.todasUnidades().filter(u => u.regiaoNome === 'Grande São Paulo e Litoral'));
-  interiorUnidades  = computed(() => this.todasUnidades().filter(u => u.regiaoNome === 'Interior'));
-  centrosUnivUnidades = computed(() => this.todasUnidades().filter(u => u.regiaoNome === 'Centros Universitários'));
+    const porRegiao = new Map<string, Unidade[]>();
+    for (const u of todas) {
+      const lista = porRegiao.get(u.regiaoNome);
+      if (lista) lista.push(u);
+      else porRegiao.set(u.regiaoNome, [u]);
+    }
 
-  gruposMobile = computed(() => {
-    const all = this.todasUnidades();
-    if (!all.length) return [];
-    const map = new Map<string, Unidade[]>();
-    for (const u of all) {
-      if (!map.has(u.regiaoNome)) map.set(u.regiaoNome, []);
-      map.get(u.regiaoNome)!.push(u);
-    }
-    const result: { regiao: string; unidades: Unidade[] }[] = [];
-    for (const nome of this.REGIAO_ORDER) {
-      if (map.has(nome)) result.push({ regiao: nome, unidades: map.get(nome)! });
-    }
-    return result;
+    const ordenadas = this.regioes().map(r => r.nome).filter(nome => porRegiao.has(nome));
+    const restantes = [...porRegiao.keys()].filter(nome => !ordenadas.includes(nome));
+
+    return [...ordenadas, ...restantes].map(regiao => ({ regiao, unidades: porRegiao.get(regiao)! }));
   });
+
+  /** O painel mobile mostra os mesmos grupos, só que empilhados. */
+  gruposMobile = this.grupos;
 
   constructor() {
     this.router.events.pipe(takeUntilDestroyed()).subscribe(() => {

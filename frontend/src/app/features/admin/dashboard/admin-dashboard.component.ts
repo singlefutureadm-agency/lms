@@ -468,8 +468,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   getStatusBadgeClass(status: string): string {
-    if (status === 'EM_ANDAMENTO') return 'bg-marca-suave text-marca-escura';
-    if (status === 'CONCLUIDO') return 'bg-emerald-100 text-sucesso';
+    if (status === 'EM_ANDAMENTO') return 'lms-badge lms-badge-marca';
+    if (status === 'CONCLUIDO') return 'lms-badge lms-badge-sucesso';
     if (status === 'CANCELADO') return 'bg-rose-100 text-rose-700';
     return 'bg-superficie-2 text-texto-suave';
   }

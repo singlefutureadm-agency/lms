@@ -21,12 +21,12 @@ interface GrupoRegiao {
       <!-- Hero -->
       <section class="bg-gradient-to-br from-marca-profunda via-marca-escura to-marca py-16 lg:py-20">
         <div class="max-w-6xl mx-auto px-6 text-center">
-          <span class="inline-block bg-white/10 text-blue-200 text-xs font-semibold uppercase
+          <span class="inline-block bg-white/10 text-white/75 text-xs font-semibold uppercase
                        tracking-widest px-4 py-1.5 rounded-full mb-5">
             Estado de São Paulo
           </span>
           <h1 class="text-4xl lg:text-5xl font-extrabold text-white mb-4">Nossas Unidades</h1>
-          <p class="text-blue-200 text-lg max-w-xl mx-auto leading-relaxed">
+          <p class="text-white/75 text-lg max-w-xl mx-auto leading-relaxed">
             Encontre a unidade mais próxima de você e comece sua jornada de aprendizado profissional.
           </p>
         </div>
@@ -71,7 +71,7 @@ interface GrupoRegiao {
                       </div>
                     }
                     <div class="flex items-start gap-3">
-                      <div class="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                      <div class="w-9 h-9 bg-marca-suave rounded-xl flex items-center justify-center shrink-0">
                         <mat-icon class="text-marca" style="font-size:18px;height:18px;width:18px">
                           location_city
                         </mat-icon>
@@ -119,7 +119,7 @@ interface GrupoRegiao {
       <section class="py-14 bg-gradient-to-br from-marca-profunda via-marca-escura to-marca">
         <div class="max-w-3xl mx-auto px-6 text-center">
           <h2 class="text-3xl font-bold text-white mb-4">Estude de onde quiser</h2>
-          <p class="text-blue-200 text-base mb-8 leading-relaxed">
+          <p class="text-white/75 text-base mb-8 leading-relaxed">
             Matricule-se online e acesse os cursos de qualquer unidade ou pelo conforto da sua casa.
           </p>
           <div class="flex flex-col sm:flex-row gap-4 justify-center">

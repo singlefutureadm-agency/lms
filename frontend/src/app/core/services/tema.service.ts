@@ -59,18 +59,22 @@ export const FONTES_DISPONIVEIS = [
 ];
 
 /**
- * Padrões. O claro é a identidade Senac atual; o escuro não é o claro
- * invertido — a marca clareia para manter contraste sobre superfície escura, e
- * o laranja é dessaturado para não vibrar.
+ * Padrões de fábrica do produto — uma paleta neutra, não a identidade de um
+ * cliente. Era a paleta institucional do cliente original (azul #0054A6 e
+ * laranja #F7941E), o que fazia toda instalação nova nascer com a marca de
+ * outra empresa.
+ *
+ * O escuro não é o claro invertido: a marca clareia para manter contraste sobre
+ * superfície escura, e o destaque é dessaturado para não vibrar.
  */
 export const TEMA_PADRAO: ConfiguracaoTema = {
   modo: 'sistema',
   claro: {
     cores: {
-      marca: '#0054A6', marcaEscura: '#003087', marcaProfunda: '#001d5c',
-      marcaSuave: '#EBF4FF', destaque: '#F7941E',
+      marca: '#2563eb', marcaEscura: '#1d4ed8', marcaProfunda: '#1e3a8a',
+      marcaSuave: '#eff6ff', destaque: '#f97316',
       fundo: '#f8fafc', superficie: '#ffffff', superficie2: '#f1f5f9',
-      texto: '#1a2e5a', textoSuave: '#64748b', borda: '#e5e7eb',
+      texto: '#0f172a', textoSuave: '#64748b', borda: '#e5e7eb',
       sucesso: '#16a34a', erro: '#e11d48', aviso: '#f59e0b',
     },
     tipografia: {

@@ -55,7 +55,7 @@
                 </p>
               </div>
               <div class="flex items-center justify-between">
-                <span [class]="m.status === 'CONCLUIDO' ? 'bg-green-100 text-sucesso' : 'bg-blue-100 text-marca'"
+                <span [class]="m.status === 'CONCLUIDO' ? 'lms-badge-sucesso' : 'lms-badge-marca'"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold">{{ m.status }}</span>
                 <a [routerLink]="['/cursos', m.cursoId]"
                   class="flex items-center gap-1 text-sm text-marca hover:text-marca-escura font-medium no-underline">

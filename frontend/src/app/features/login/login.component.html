@@ -5,37 +5,25 @@
     <div class="absolute top-0 left-0 w-80 h-80 bg-white/5 rounded-full -ml-20 -mt-20"></div>
     <div class="absolute bottom-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-16 -mb-16"></div>
     <div class="relative">
-      <div class="flex items-center gap-3 mb-10">
-        <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-          <span class="material-icons text-white text-2xl">school</span>
-        </div>
-        <span class="text-2xl font-bold">Senac <span class="text-destaque">LMS</span></span>
+      <div class="mb-10">
+        <app-logo-marca sobre="marca" tamanho="lg"></app-logo-marca>
       </div>
-      <h1 class="text-4xl font-bold mb-4 leading-tight">
-        Educação<br>Profissional<br>de Excelência
-      </h1>
-      <p class="text-blue-200 text-lg leading-relaxed">
+      <h1 class="text-4xl font-bold mb-4 leading-tight">{{ marca.nome() }}</h1>
+      @if (marca.assinatura()) {
+        <p class="text-white/75 text-lg leading-relaxed">{{ marca.assinatura() }}</p>
+      }
+      <p class="text-white/75 text-lg leading-relaxed mt-2">
         Acesse sua conta para continuar<br>sua jornada de aprendizado.
       </p>
       <div class="mt-10 flex flex-col gap-3">
-        <div class="flex items-center gap-3 text-blue-200">
-          <div class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center shrink-0">
-            <span class="material-icons text-sm">check</span>
+        @for (item of destaques; track item) {
+          <div class="flex items-center gap-3 text-white/75">
+            <div class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center shrink-0">
+              <span class="material-icons text-sm">check</span>
+            </div>
+            <span class="text-sm">{{ item }}</span>
           </div>
-          <span class="text-sm">Cursos de nível básico ao avançado</span>
-        </div>
-        <div class="flex items-center gap-3 text-blue-200">
-          <div class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center shrink-0">
-            <span class="material-icons text-sm">check</span>
-          </div>
-          <span class="text-sm">Acompanhe seu progresso em tempo real</span>
-        </div>
-        <div class="flex items-center gap-3 text-blue-200">
-          <div class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center shrink-0">
-            <span class="material-icons text-sm">check</span>
-          </div>
-          <span class="text-sm">Certificação reconhecida pelo mercado</span>
-        </div>
+        }
       </div>
     </div>
   </div>
@@ -44,11 +32,8 @@
   <div class="flex-1 flex items-center justify-center p-6 lg:p-16">
     <div class="w-full max-w-md">
       <!-- Mobile logo -->
-      <div class="flex items-center gap-2 mb-8 lg:hidden justify-center">
-        <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-          <span class="material-icons text-white">school</span>
-        </div>
-        <span class="text-xl font-bold text-white">Senac <span class="text-destaque">LMS</span></span>
+      <div class="flex mb-8 lg:hidden justify-center">
+        <app-logo-marca sobre="marca" tamanho="md"></app-logo-marca>
       </div>
 
       <div class="bg-superficie rounded-3xl shadow-2xl overflow-hidden">
@@ -103,8 +88,8 @@
         </mat-tab-group>
       </div>
 
-      <p class="text-center text-blue-200 text-xs mt-6">
-        © {{ year }} Senac LMS · Sistema de Gestão de Cursos
+      <p class="text-center text-white/70 text-xs mt-6">
+        © {{ year }} {{ marca.nome() }}@if (marca.assinatura()) { · {{ marca.assinatura() }} }
       </p>
     </div>
   </div>

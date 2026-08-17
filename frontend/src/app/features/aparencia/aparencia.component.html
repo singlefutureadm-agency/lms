@@ -5,10 +5,124 @@
     <p class="text-xs font-semibold text-texto-suave uppercase tracking-wide">Preferências</p>
     <h1 class="text-2xl font-bold text-texto mt-1">Aparência</h1>
     <p class="text-sm text-texto-suave mt-1">
-      Ajuste as cores e a tipografia do sistema. Cada modo tem a própria configuração,
-      e o que você definir aqui fica salvo neste navegador.
+      Identidade, cores e tipografia do sistema. É daqui que sai tudo que muda de um
+      cliente para outro.
     </p>
   </header>
+
+  <!-- ═══ Identidade da empresa ═══ -->
+  <section class="bg-superficie border border-borda rounded-xl p-5 shadow-card mb-6">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+      <h2 class="text-sm font-semibold text-texto">Identidade</h2>
+      <span class="lms-badge lms-badge-marca">Vale para toda a instalação</span>
+    </div>
+    <p class="text-xs text-texto-suave mb-5">
+      Nome e logotipo aparecem na barra do sistema, na tela de login, no rodapé do site
+      e na aba do navegador. Diferente das cores, ficam salvos no servidor: você define
+      uma vez e todos os usuários passam a ver.
+    </p>
+
+    @if (!podeEditarMarca()) {
+      <p class="text-xs text-texto-suave border border-borda rounded-xl p-4 bg-fundo">
+        Só administradores podem alterar a identidade da instalação. As cores e a
+        tipografia abaixo continuam sendo suas, salvas neste navegador.
+      </p>
+    } @else {
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="lms-field">
+          <label class="lms-label" for="marca-nome">Nome da empresa <span class="required">*</span></label>
+          <input id="marca-nome" type="text" class="lms-input" maxlength="60"
+                 [value]="formMarca().nome"
+                 (input)="aoMudarNome($event)"
+                 placeholder="Ex: Acme Educação" />
+          <p class="lms-hint">Obrigatório, até 60 caracteres.</p>
+        </div>
+
+        <div class="lms-field">
+          <label class="lms-label" for="marca-assinatura">Assinatura</label>
+          <input id="marca-assinatura" type="text" class="lms-input" maxlength="90"
+                 [value]="formMarca().assinatura"
+                 (input)="aoMudarAssinatura($event)"
+                 placeholder="Ex: Educação corporativa" />
+          <p class="lms-hint">Frase curta ao lado do nome no login e no rodapé. Opcional.</p>
+        </div>
+      </div>
+
+      <!-- Salvamento explícito: um PUT por tecla digitada seria absurdo, e um
+           debounce esconderia do administrador o momento em que a mudança
+           passou a valer para todo mundo. -->
+      <div class="flex flex-wrap items-center gap-3 mb-6">
+        <button type="button" (click)="salvarMarca()"
+                [disabled]="salvandoMarca() || !marcaAlterada() || !formMarca().nome.trim()"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-marca text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-50">
+          <mat-icon class="text-base! w-4! h-4!">{{ salvandoMarca() ? 'hourglass_empty' : 'save' }}</mat-icon>
+          {{ salvandoMarca() ? 'Salvando...' : 'Salvar identidade' }}
+        </button>
+        @if (marcaAlterada()) {
+          <button type="button" (click)="descartarMarca()"
+                  class="px-4 py-2 rounded-xl border border-borda bg-superficie text-texto text-sm font-medium cursor-pointer">
+            Descartar
+          </button>
+          <span class="text-xs text-aviso">Alterações ainda não salvas.</span>
+        }
+        @if (!marca.sincronizada()) {
+          <span class="text-xs text-erro">Sem conexão com o servidor — exibindo o último valor conhecido.</span>
+        }
+      </div>
+
+      <!-- Dois logos: a barra do sistema tem fundo da cor da marca, o site tem fundo
+           claro. Um logo escuro sumiria na barra; um claro sumiria no site. -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        @for (campo of camposDeLogo; track campo.variante) {
+          <div class="border border-borda rounded-xl p-4">
+            <p class="text-xs font-semibold text-texto uppercase tracking-wide">{{ campo.rotulo }}</p>
+            <p class="text-xs text-texto-suave mt-0.5 mb-3">{{ campo.ajuda }}</p>
+
+            <div class="rounded-lg h-24 flex items-center justify-center mb-3 overflow-hidden border border-borda relative"
+                 [style.background]="campo.variante === 'INVERSO' ? paletaEmEdicao().marca : paletaEmEdicao().superficie">
+              @if (marca.marca()[campo.chave]) {
+                <img [src]="marca.marca()[campo.chave]" alt="Prévia do logotipo" class="max-h-16 max-w-[80%] object-contain" />
+              } @else {
+                <!-- A caixa do logo inverso é pintada com a cor da marca; o texto
+                     de reserva precisa contrastar com ela, não com a superfície. -->
+                <span class="text-xs"
+                      [style.color]="campo.variante === 'INVERSO' ? 'rgba(255,255,255,.75)' : paletaEmEdicao().textoSuave">
+                  Nenhum logotipo enviado
+                </span>
+              }
+              @if (enviandoLogo() === campo.variante) {
+                <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <span class="text-xs text-white font-semibold">Enviando...</span>
+                </div>
+              }
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="px-3 py-1.5 rounded-lg border border-borda bg-superficie text-texto text-xs font-semibold cursor-pointer hover:border-marca">
+                Enviar arquivo
+                <input type="file" class="hidden" [accept]="tiposAceitos"
+                       (change)="aoSelecionarLogo(campo.variante, $event)" />
+              </label>
+              @if (marca.marca()[campo.chave]) {
+                <button type="button" (click)="removerLogo(campo.variante)"
+                        class="px-3 py-1.5 rounded-lg border border-borda bg-superficie text-texto-suave text-xs font-medium cursor-pointer hover:text-erro hover:border-erro">
+                  Remover
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (erroLogo()) {
+        <p class="lms-error mt-3">{{ erroLogo() }}</p>
+      }
+      <p class="lms-hint mt-3">
+        PNG, JPG ou WebP, até {{ logoMaxKb }}KB. Os logotipos são enviados na hora, sem
+        precisar salvar. Sem logotipo, o sistema usa um ícone genérico com o nome ao lado.
+      </p>
+    }
+  </section>
 
   <!-- Modo ativo -->
   <section class="bg-superficie border border-borda rounded-xl p-5 shadow-card mb-6">
@@ -195,7 +309,12 @@
 
       <!-- barra superior -->
       <div class="pv-topo flex items-center justify-between px-4 py-2.5">
-        <span class="text-white font-bold text-sm">Senac LMS</span>
+        <span class="flex items-center gap-2 min-w-0">
+          @if (marca.logoInversoEfetivo()) {
+            <img [src]="marca.logoInversoEfetivo()" alt="" class="h-5 max-w-[90px] object-contain shrink-0" />
+          }
+          <span class="text-white font-bold text-sm truncate">{{ marca.nome() }}</span>
+        </span>
         <span class="pv-btn-destaque px-3 py-1 rounded-lg text-white text-xs font-semibold cursor-pointer">
           Matricule-se
         </span>
@@ -250,5 +369,9 @@
       Restaurar tudo
     </button>
 
+    <!-- "Restaurar tudo" acima cobre só cores e tipografia, que são deste
+         navegador. A identidade não entra: é da instalação, tem edição própria
+         com salvamento explícito, e um botão de "restaurar" ao lado destes
+         daria a impressão de ser reversível localmente. -->
   </section>
 </div>

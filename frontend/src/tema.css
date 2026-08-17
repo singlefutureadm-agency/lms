@@ -13,18 +13,18 @@
  */
 
 :root {
-  /* ─── Marca ─────────────────────────────────────────────────────────────── */
-  --tema-marca: #0054A6;
-  --tema-marca-escura: #003087;
-  --tema-marca-profunda: #001d5c;
-  --tema-marca-suave: #EBF4FF;
-  --tema-destaque: #F7941E;
+  /* ─── Marca (padrão de fábrica, neutro — o cliente troca em Aparência) ──── */
+  --tema-marca: #2563eb;
+  --tema-marca-escura: #1d4ed8;
+  --tema-marca-profunda: #1e3a8a;
+  --tema-marca-suave: #eff6ff;
+  --tema-destaque: #f97316;
 
   /* ─── Superfícies e texto ───────────────────────────────────────────────── */
   --tema-fundo: #f8fafc;
   --tema-superficie: #ffffff;
   --tema-superficie-2: #f1f5f9;
-  --tema-texto: #1a2e5a;
+  --tema-texto: #0f172a;
   --tema-texto-suave: #64748b;
   --tema-borda: #e5e7eb;
 

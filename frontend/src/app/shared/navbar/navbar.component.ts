@@ -6,10 +6,11 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../core/services/auth.service';
 import { TemaService } from '../../core/services/tema.service';
 import { NotificacaoSinoComponent } from '../notificacao-sino/notificacao-sino.component';
+import { LogoMarcaComponent } from '../logo-marca/logo-marca.component';
 
 @Component({
     selector: 'app-navbar',
-    imports: [RouterModule, MatIconModule, MatTooltipModule, NotificacaoSinoComponent],
+    imports: [RouterModule, MatIconModule, MatTooltipModule, NotificacaoSinoComponent, LogoMarcaComponent],
     template: `
     <!-- Top bar -->
     <header class="fixed top-0 left-0 right-0 h-16 bg-marca z-50 flex items-center px-4 gap-4 shadow-md">
@@ -18,11 +19,8 @@ import { NotificacaoSinoComponent } from '../notificacao-sino/notificacao-sino.c
         <mat-icon>{{ sidebarOpen() ? 'close' : 'menu' }}</mat-icon>
       </button>
     
-      <div class="flex items-center gap-2.5 cursor-pointer" routerLink="/dashboard">
-        <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-          <mat-icon class="text-white text-lg">school</mat-icon>
-        </div>
-        <span class="text-xl font-bold text-white hidden sm:block">Senac <span class="text-destaque">LMS</span></span>
+      <div class="flex items-center cursor-pointer min-w-0" routerLink="/dashboard">
+        <app-logo-marca sobre="marca" tamanho="sm"></app-logo-marca>
       </div>
     
       <div class="flex-1"></div>
@@ -30,7 +28,7 @@ import { NotificacaoSinoComponent } from '../notificacao-sino/notificacao-sino.c
       <div class="flex items-center gap-3">
         <div class="hidden sm:flex flex-col items-end">
           <span class="text-sm font-semibold text-white">{{ auth.currentUser()?.nome }}</span>
-          <span class="text-xs text-blue-200 font-medium">{{ auth.currentUser()?.role }}</span>
+          <span class="text-xs text-white/75 font-medium">{{ auth.currentUser()?.role }}</span>
         </div>
         <div class="w-9 h-9 rounded-full bg-white/20 border-2 border-white/30 overflow-hidden flex items-center justify-center text-white font-bold text-sm shrink-0">
           @if (auth.currentUser()?.avatarUrl) {
@@ -109,7 +107,7 @@ import { NotificacaoSinoComponent } from '../notificacao-sino/notificacao-sino.c
         @if (auth.isProfessor() && !auth.isAdmin()) {
           <div class="pt-4">
             <p class="text-xs font-semibold text-texto-suave uppercase tracking-wider px-4 mb-2">Professor</p>
-            <a routerLink="/professor/cursos" routerLinkActive="bg-emerald-50 text-sucesso border-emerald-200"
+            <a routerLink="/professor/cursos" routerLinkActive="bg-sucesso/10 text-sucesso border-sucesso/30"
               (click)="sidebarOpen.set(false)"
               class="flex items-center gap-3 px-4 py-3 rounded-xl text-texto-suave hover:bg-sucesso/10 hover:text-sucesso transition-colors font-medium text-sm border border-transparent no-underline">
               <mat-icon class="shrink-0">cast_for_education</mat-icon>

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -6,10 +6,19 @@ import {
   TemaService, TOKENS_COR, ROTULOS_COR, FONTES_DISPONIVEIS,
   type TokenCor, type ModoTema,
 } from '../../core/services/tema.service';
+import {
+  MarcaService, LOGO_MAX_BYTES, LOGO_TIPOS_ACEITOS, type Marca, type VarianteLogo,
+} from '../../core/services/marca.service';
+import { AuthService } from '../../core/services/auth.service';
+import { mensagemDeErro } from '../../core/interceptors/error.interceptor';
 
 /**
- * Configuração de aparência: cores e tipografia, definidas separadamente para
- * o modo claro e o escuro.
+ * Configuração de aparência: identidade (nome e logotipos), cores e tipografia.
+ * Cores e tipografia são definidas separadamente para o modo claro e o escuro;
+ * a identidade é uma só, porque não muda com o modo.
+ *
+ * Esta é a única tela de personalização do produto: o que um cliente precisa
+ * trocar para a instalação virar "dele" está todo aqui.
  *
  * O modo que está sendo **editado** é independente do modo que está **ativo**
  * na aplicação: dá para ajustar o tema escuro enquanto se navega no claro. Por
@@ -90,10 +99,40 @@ import {
 export class AparenciaComponent {
   private readonly snack = inject(MatSnackBar);
   readonly tema = inject(TemaService);
+  readonly marca = inject(MarcaService);
 
   readonly tokens = TOKENS_COR;
   readonly rotulos = ROTULOS_COR;
   readonly fontes = FONTES_DISPONIVEIS;
+
+  private readonly auth = inject(AuthService);
+
+  readonly logoMaxKb = Math.round(LOGO_MAX_BYTES / 1024);
+  readonly tiposAceitos = LOGO_TIPOS_ACEITOS.join(',');
+  readonly erroLogo = signal<string | null>(null);
+  readonly salvandoMarca = signal(false);
+  readonly enviandoLogo = signal<VarianteLogo | null>(null);
+
+  /** Identidade é configuração da instalação — só ADMIN escreve (o backend também barra). */
+  readonly podeEditarMarca = computed(() => this.auth.isAdmin());
+
+  /**
+   * Rascunho local de nome/assinatura. Existe porque o salvamento é explícito:
+   * digitar não pode alterar o que os outros usuários veem antes de o
+   * administrador confirmar.
+   */
+  readonly formMarca = signal({ nome: '', assinatura: '' });
+
+  readonly marcaAlterada = computed(() => {
+    const atual = this.marca.marca();
+    const form = this.formMarca();
+    return form.nome !== atual.nome || form.assinatura !== atual.assinatura;
+  });
+
+  readonly camposDeLogo: { variante: VarianteLogo; chave: keyof Pick<Marca, 'logo' | 'logoInverso'>; rotulo: string; ajuda: string }[] = [
+    { variante: 'PRINCIPAL', chave: 'logo', rotulo: 'Logotipo principal', ajuda: 'Usado no site público e em fundos claros.' },
+    { variante: 'INVERSO', chave: 'logoInverso', rotulo: 'Logotipo em fundo escuro', ajuda: 'Barra do sistema e login. Sem ele, usa o principal.' },
+  ];
 
   /** Modo cuja paleta está sendo editada — não necessariamente o modo ativo. */
   readonly editando = signal<'claro' | 'escuro'>(this.tema.modoEfetivo());
@@ -116,6 +155,100 @@ export class AparenciaComponent {
     { valor: 'escuro',  rotulo: 'Escuro',  icone: 'dark_mode' },
     { valor: 'sistema', rotulo: 'Sistema', icone: 'contrast' },
   ];
+
+  // ─── Identidade ──────────────────────────────────────────────────────────
+
+  /**
+   * Marca que o administrador começou a digitar. Sem esta flag, o efeito de
+   * sincronização abaixo teria de comparar o rascunho com o servidor — e
+   * comparar significaria LER o rascunho, que é o mesmo sinal que ele escreve:
+   * um ciclo infinito de leitura→escrita→reexecução.
+   */
+  private readonly rascunhoTocado = signal(false);
+
+  constructor() {
+    // Espelha o valor do servidor no rascunho sempre que ele muda (carga
+    // inicial, salvamento, upload de logotipo) — sem sobrescrever o que o
+    // administrador está digitando agora. `untracked` mantém `marca.marca()`
+    // como única dependência do efeito.
+    effect(() => {
+      const atual = this.marca.marca();
+      untracked(() => {
+        if (this.rascunhoTocado()) return;
+        this.formMarca.set({ nome: atual.nome, assinatura: atual.assinatura });
+      });
+    });
+  }
+
+  aoMudarNome(evento: Event): void {
+    this.rascunhoTocado.set(true);
+    this.formMarca.update(f => ({ ...f, nome: (evento.target as HTMLInputElement).value }));
+  }
+
+  aoMudarAssinatura(evento: Event): void {
+    this.rascunhoTocado.set(true);
+    this.formMarca.update(f => ({ ...f, assinatura: (evento.target as HTMLInputElement).value }));
+  }
+
+  salvarMarca(): void {
+    const form = this.formMarca();
+    if (!form.nome.trim()) return;
+    this.salvandoMarca.set(true);
+    this.marca.salvar({ nome: form.nome.trim(), assinatura: form.assinatura.trim() }).subscribe({
+      next: () => {
+        this.salvandoMarca.set(false);
+        // Solta o rascunho: o efeito volta a espelhar o servidor, que agora é
+        // quem tem o valor confirmado.
+        this.rascunhoTocado.set(false);
+        this.snack.open('Identidade salva para toda a instalação', 'OK', { duration: 3000 });
+      },
+      error: (e) => {
+        this.salvandoMarca.set(false);
+        this.snack.open(mensagemDeErro(e, 'Erro ao salvar a identidade'), 'Fechar', { duration: 4000 });
+      },
+    });
+  }
+
+  descartarMarca(): void {
+    const atual = this.marca.marca();
+    this.formMarca.set({ nome: atual.nome, assinatura: atual.assinatura });
+    this.rascunhoTocado.set(false);
+  }
+
+  aoSelecionarLogo(variante: VarianteLogo, evento: Event): void {
+    const input = evento.target as HTMLInputElement;
+    const file = input.files?.[0];
+    // Limpa o input para que reenviar o MESMO arquivo depois de um erro ainda
+    // dispare o change.
+    input.value = '';
+    if (!file) return;
+
+    const erro = this.marca.validarArquivo(file);
+    this.erroLogo.set(erro);
+    if (erro) return;
+
+    this.enviandoLogo.set(variante);
+    this.marca.enviarLogo(variante, file).subscribe({
+      next: () => {
+        this.enviandoLogo.set(null);
+        this.snack.open('Logotipo atualizado', 'OK', { duration: 2500 });
+      },
+      error: (e) => {
+        this.enviandoLogo.set(null);
+        this.erroLogo.set(mensagemDeErro(e, 'Erro ao enviar o logotipo'));
+      },
+    });
+  }
+
+  removerLogo(variante: VarianteLogo): void {
+    this.erroLogo.set(null);
+    this.marca.removerLogo(variante).subscribe({
+      next: () => this.snack.open('Logotipo removido', 'OK', { duration: 2500 }),
+      error: (e) => this.erroLogo.set(mensagemDeErro(e, 'Erro ao remover o logotipo')),
+    });
+  }
+
+  // ─── Cores e tipografia ──────────────────────────────────────────────────
 
   editarModo(modo: 'claro' | 'escuro'): void {
     this.editando.set(modo);

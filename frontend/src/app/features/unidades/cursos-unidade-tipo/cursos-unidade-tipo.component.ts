@@ -36,7 +36,7 @@ const PER_PAGE = 4;
             <span class="text-white"> em {{ unidadeNome() }}</span>
           </h1>
           @if (todosCursos().length) {
-            <p class="text-blue-200 mt-2">
+            <p class="text-white/75 mt-2">
               {{ todosCursos().length }} curso{{ todosCursos().length !== 1 ? 's' : '' }} disponíveis
             </p>
           }

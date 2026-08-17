@@ -48,26 +48,14 @@
 }
 
 /* Config em CSS: o v4 substitui o tailwind.config.js por @theme. Cada token
-   também vira uma custom property utilizável fora das utilities. */
+   também vira uma custom property utilizável fora das utilities.
+ *
+ * Aqui só ficam tokens NEUTROS. As escalas de cor institucionais fixas que
+ * existiam antes saíram: numa aplicação white-label, cor de marca é dado de
+ * configuração do cliente — vive nos tokens `--tema-*`, que a página de
+ * Aparência escreve em tempo de execução. Nenhuma delas estava em uso nos
+ * templates. */
 @theme {
-  --color-senac-50:  #e6f0fb;
-  --color-senac-100: #c0d9f4;
-  --color-senac-200: #8bb8e9;
-  --color-senac-500: #0072ce;
-  --color-senac-600: #0054A6;
-  --color-senac-700: #003f90;
-  --color-senac-800: #003087;
-  --color-senac-900: #001f5b;
-
-  --color-primary-50:  #eef2ff;
-  --color-primary-100: #e0e7ff;
-  --color-primary-500: #6366f1;
-  --color-primary-600: #4f46e5;
-  --color-primary-700: #4338ca;
-  --color-primary-900: #312e81;
-
-  --color-surface: #f8fafc;
-
   --shadow-card:       0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
@@ -130,3 +118,33 @@
   &.cols-3 { @apply md:grid-cols-2 lg:grid-cols-3; }
   &.cols-4 { @apply md:grid-cols-2 lg:grid-cols-4; }
 }
+
+/* ─── Selos (badges) ───────────────────────────────────────────────────────
+ *
+ * Os selos eram pares fixos de cor — ou do Tailwind (`bg-purple-100
+ * text-purple-700`), que não acompanham o tema, ou de dois tokens da marca
+ * (`bg-marca-suave` + `text-marca-escura`), que ficam ilegíveis assim que o
+ * cliente escolhe uma paleta onde ambos são escuros. Nenhum dos dois sobrevive
+ * a um produto white-label, em que a paleta é dado de configuração.
+ *
+ * Aqui a cor de destaque entra só como TINTA no fundo e como borda; o texto
+ * usa `--tema-texto`, que a própria página de Aparência já garante legível
+ * sobre `--tema-superficie`. Assim o contraste é estrutural: vale para
+ * qualquer paleta que o cliente configure, clara ou escura, sem depender de o
+ * token acessório ter sido bem escolhido.
+ */
+.lms-badge {
+  @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border align-middle;
+
+  --lms-badge-cor: var(--tema-texto-suave);
+  background: color-mix(in srgb, var(--lms-badge-cor) 14%, var(--tema-superficie));
+  border-color: color-mix(in srgb, var(--lms-badge-cor) 40%, transparent);
+  color: var(--tema-texto);
+}
+
+.lms-badge-marca    { --lms-badge-cor: var(--tema-marca); }
+.lms-badge-destaque { --lms-badge-cor: var(--tema-destaque); }
+.lms-badge-sucesso  { --lms-badge-cor: var(--tema-sucesso); }
+.lms-badge-erro     { --lms-badge-cor: var(--tema-erro); }
+.lms-badge-aviso    { --lms-badge-cor: var(--tema-aviso); }
+.lms-badge-neutro   { --lms-badge-cor: var(--tema-texto-suave); }

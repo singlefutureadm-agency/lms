@@ -6,6 +6,7 @@ import { filter } from 'rxjs/operators';
 import { NavbarComponent } from './shared/navbar/navbar.component';
 import { PublicNavComponent } from './shared/public-nav/public-nav.component';
 import { AuthService } from './core/services/auth.service';
+import { MarcaService } from './core/services/marca.service';
 import { AccessibilityComponent } from './accessibility/accessibility.component';
 
 @Component({
@@ -37,6 +38,10 @@ import { AccessibilityComponent } from './accessibility/accessibility.component'
 export class AppComponent {
   auth = inject(AuthService);
   private router = inject(Router);
+  // Injetado na raiz para garantir que o serviço exista desde o primeiro
+  // render: é o efeito dele que escreve título da aba e favicon. Sem isso,
+  // uma rota que não exiba o logotipo abriria com o título de partida.
+  private marca = inject(MarcaService);
   currentUrl = signal('');
 
   constructor() {

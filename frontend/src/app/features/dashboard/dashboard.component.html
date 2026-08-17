@@ -17,13 +17,13 @@
         </app-image-upload>
       </div>
 
-      <p class="text-blue-300 text-xs font-semibold uppercase tracking-widest mb-3">
+      <p class="text-white/70 text-xs font-semibold uppercase tracking-widest mb-3">
         {{ saudacao }}, {{ (auth.currentUser()?.nome || '').split(' ')[0] }}!
       </p>
       <h1 class="text-4xl lg:text-5xl font-bold text-white mb-3">
         Quer fazer?<span class="text-destaque"> |</span>
       </h1>
-      <p class="text-blue-200 text-lg mb-8 max-w-xl leading-relaxed">
+      <p class="text-white/75 text-lg mb-8 max-w-xl leading-relaxed">
         Aqui você encontra o melhor da educação profissional.<br>
         <span class="font-semibold text-white">Transforme sua carreira</span> com os melhores cursos.
       </p>
@@ -50,15 +50,15 @@
         <div class="flex items-center gap-3 flex-wrap">
           <span class="text-sm font-semibold text-texto-suave shrink-0">Conheça nossos cursos:</span>
           <button (click)="irParaCursos('BASICO')"
-            class="px-4 py-1.5 rounded-full text-sm font-medium bg-green-100 text-sucesso hover:bg-sucesso/20 transition-colors cursor-pointer border-0 shrink-0">
+            class="lms-badge lms-badge-sucesso text-sm px-4 py-1.5 cursor-pointer hover:opacity-80 transition-opacity shrink-0">
             Básico
           </button>
           <button (click)="irParaCursos('INTERMEDIARIO')"
-            class="px-4 py-1.5 rounded-full text-sm font-medium bg-yellow-100 text-aviso hover:bg-aviso/25 transition-colors cursor-pointer border-0 shrink-0">
+            class="lms-badge lms-badge-aviso text-sm px-4 py-1.5 cursor-pointer hover:opacity-80 transition-opacity shrink-0">
             Intermediário
           </button>
           <button (click)="irParaCursos('AVANCADO')"
-            class="px-4 py-1.5 rounded-full text-sm font-medium bg-red-100 text-erro hover:bg-erro/20 transition-colors cursor-pointer border-0 shrink-0">
+            class="lms-badge lms-badge-erro text-sm px-4 py-1.5 cursor-pointer hover:opacity-80 transition-opacity shrink-0">
             Avançado
           </button>
           <a routerLink="/cursos"
@@ -94,7 +94,7 @@
 
           <a routerLink="/matriculas"
             class="flex flex-col items-center gap-3 bg-superficie rounded-2xl py-6 px-4 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all cursor-pointer no-underline group">
-            <div class="w-14 h-14 bg-purple-500 rounded-2xl flex items-center justify-center group-hover:bg-marca transition-colors">
+            <div class="w-14 h-14 bg-destaque rounded-2xl flex items-center justify-center group-hover:bg-marca transition-colors">
               <mat-icon class="text-white">trending_up</mat-icon>
             </div>
             <span class="text-sm font-medium text-texto text-center leading-tight">Meu Progresso</span>
@@ -151,16 +151,16 @@
               <div class="text-3xl font-bold text-marca mb-1">{{ matriculas().length }}</div>
               <div class="text-sm text-texto-suave">Matrículas</div>
             </div>
-            <div class="bg-blue-50 rounded-2xl p-5">
+            <div class="bg-marca-suave rounded-2xl p-5">
               <div class="text-3xl font-bold text-blue-600 mb-1">{{ emAndamento().length }}</div>
               <div class="text-sm text-texto-suave">Em andamento</div>
             </div>
-            <div class="bg-green-50 rounded-2xl p-5">
+            <div class="bg-sucesso/10 rounded-2xl p-5">
               <div class="text-3xl font-bold text-green-600 mb-1">{{ concluidos().length }}</div>
               <div class="text-sm text-texto-suave">Concluídos</div>
             </div>
-            <div class="bg-purple-50 rounded-2xl p-5">
-              <div class="text-3xl font-bold text-purple-600 mb-1">{{ mediaProgresso() }}%</div>
+            <div class="bg-destaque/10 rounded-2xl p-5">
+              <div class="text-3xl font-bold text-marca mb-1">{{ mediaProgresso() }}%</div>
               <div class="text-sm text-texto-suave">Progresso médio</div>
             </div>
           </div>
@@ -246,7 +246,7 @@
                   <div class="h-1.5 w-full" [class]="getNivelBg(c.nivel)"></div>
                   <div class="p-5">
                     <div class="flex items-center justify-between mb-3 gap-2">
-                      <span [class]="getNivelClass(c.nivel)" class="px-2.5 py-1 rounded-full text-xs font-semibold shrink-0">
+                      <span [class]="getNivelClass(c.nivel)" class="lms-badge shrink-0">
                         {{ c.nivel }}
                       </span>
                       @if (c.unidadeNome) {

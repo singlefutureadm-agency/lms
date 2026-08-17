@@ -28,7 +28,7 @@ import { CursoService, Curso, Page } from '../../../core/services/curso.service'
           <h1 class="text-3xl lg:text-4xl font-extrabold text-white mb-2 capitalize">
             {{ slugLabel(categoriaSlug()) }}
           </h1>
-          <p class="text-blue-200">
+          <p class="text-white/75">
             @if (resultado()) {
               <span>{{ resultado()!.page.totalElements }} curso{{ resultado()!.page.totalElements !== 1 ? 's' : '' }} encontrado{{ resultado()!.page.totalElements !== 1 ? 's' : '' }}</span>
             }

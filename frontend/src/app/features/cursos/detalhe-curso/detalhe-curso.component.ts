@@ -56,11 +56,11 @@ export class DetalheCursoComponent implements OnInit {
 
   getNivelClass(nivel: string): string {
     const map: Record<string, string> = {
-      'BASICO': 'bg-green-100 text-sucesso',
-      'INTERMEDIARIO': 'bg-yellow-100 text-aviso',
-      'AVANCADO': 'bg-red-100 text-erro'
+      BASICO: 'lms-badge-sucesso',
+      INTERMEDIARIO: 'lms-badge-aviso',
+      AVANCADO: 'lms-badge-erro'
     };
-    return map[nivel] || 'bg-superficie-2 text-texto';
+    return map[nivel] || 'lms-badge-neutro';
   }
 
   getNivelBg(nivel: string): string {

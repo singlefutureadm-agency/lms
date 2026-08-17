@@ -13,7 +13,7 @@
           placeholder="Busque por título ou palavra-chave..."
           class="lms-input w-full pl-11" />
       </div>
-      <p class="text-blue-200 mt-4">
+      <p class="text-white/75 mt-4">
         @if (resultado()) {
           <span>{{ resultado()!.page.totalElements }} curso{{ resultado()!.page.totalElements !== 1 ? 's' : '' }} encontrado{{ resultado()!.page.totalElements !== 1 ? 's' : '' }}</span>
         }

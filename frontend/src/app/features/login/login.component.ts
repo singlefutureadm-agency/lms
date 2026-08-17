@@ -5,10 +5,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { AuthService } from '../../core/services/auth.service';
+import { MarcaService } from '../../core/services/marca.service';
+import { LogoMarcaComponent } from '../../shared/logo-marca/logo-marca.component';
 
 @Component({
     selector: 'app-login',
-    imports: [ReactiveFormsModule, MatSnackBarModule, MatTabsModule],
+    imports: [ReactiveFormsModule, MatSnackBarModule, MatTabsModule, LogoMarcaComponent],
     templateUrl: './login.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrls: ['./login.component.scss']
@@ -19,6 +21,14 @@ export class LoginComponent {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private snack = inject(MatSnackBar);
+  readonly marca = inject(MarcaService);
+
+  /** Argumentos de venda do produto, não de um cliente específico. */
+  readonly destaques = [
+    'Cursos de nível básico ao avançado',
+    'Acompanhe seu progresso em tempo real',
+    'Certificados ao concluir cada curso',
+  ];
 
   loginForm = this.fb.group({ email: ['', [Validators.required, Validators.email]], senha: ['', Validators.required] });
   registerForm = this.fb.group({ nome: ['', Validators.required], email: ['', [Validators.required, Validators.email]], senha: ['', [Validators.required, Validators.minLength(6)]] });

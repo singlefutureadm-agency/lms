@@ -12,13 +12,13 @@
 
         <!-- Left: text + search -->
         <div>
-          <span class="inline-block bg-white/10 text-blue-200 text-xs font-semibold uppercase tracking-widest px-4 py-1.5 rounded-full mb-5">
+          <span class="inline-block bg-white/10 text-white/75 text-xs font-semibold uppercase tracking-widest px-4 py-1.5 rounded-full mb-5">
             Portal de Educação Profissional
           </span>
           <h1 class="text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-5">
             Quer fazer?<span class="text-destaque animate-pulse"> |</span>
           </h1>
-          <p class="text-blue-200 text-xl mb-8 leading-relaxed">
+          <p class="text-white/75 text-xl mb-8 leading-relaxed">
             Aqui você encontra o melhor da educação profissional.<br>
             <span class="text-white font-semibold">Transforme sua carreira</span> com os melhores cursos.
           </p>
@@ -62,11 +62,11 @@
             <div class="flex gap-5">
               <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 text-white text-center w-40">
                 <div class="text-3xl font-extrabold text-destaque">{{ totalCursos() }}+</div>
-                <div class="text-blue-200 text-sm mt-1">Cursos</div>
+                <div class="text-white/75 text-sm mt-1">Cursos</div>
               </div>
               <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 text-white text-center w-40">
                 <div class="text-3xl font-extrabold text-white">100%</div>
-                <div class="text-blue-200 text-sm mt-1">Online</div>
+                <div class="text-white/75 text-sm mt-1">Online</div>
               </div>
             </div>
             <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-6 text-white w-full max-w-xs">
@@ -76,14 +76,14 @@
                 </div>
                 <div>
                   <div class="font-semibold text-sm">Certificado Reconhecido</div>
-                  <div class="text-blue-300 text-xs">Mercado nacional</div>
+                  <div class="text-white/70 text-xs">Mercado nacional</div>
                 </div>
               </div>
               <div class="flex gap-1 mt-2">
                 @for (i of [1,2,3,4,5]; track i) {
                   <div class="text-destaque text-sm">★</div>
                 }
-                <span class="text-blue-200 text-xs ml-2">5.0 avaliação</span>
+                <span class="text-white/75 text-xs ml-2">5.0 avaliação</span>
               </div>
             </div>
           </div>
@@ -107,15 +107,15 @@
           <!-- Fallback chips se API ainda não carregou -->
           @if (areas().length === 0) {
             <button (click)="irParaCursos('BASICO')"
-              class="px-4 py-1.5 rounded-full text-sm font-medium bg-green-100 text-sucesso hover:bg-sucesso/20 transition-colors cursor-pointer border-0">
+              class="lms-badge lms-badge-sucesso text-sm px-4 py-1.5 cursor-pointer hover:opacity-80 transition-opacity">
               Básico
             </button>
             <button (click)="irParaCursos('INTERMEDIARIO')"
-              class="px-4 py-1.5 rounded-full text-sm font-medium bg-yellow-100 text-aviso hover:bg-aviso/25 transition-colors cursor-pointer border-0">
+              class="lms-badge lms-badge-aviso text-sm px-4 py-1.5 cursor-pointer hover:opacity-80 transition-opacity">
               Intermediário
             </button>
             <button (click)="irParaCursos('AVANCADO')"
-              class="px-4 py-1.5 rounded-full text-sm font-medium bg-red-100 text-erro hover:bg-erro/20 transition-colors cursor-pointer border-0">
+              class="lms-badge lms-badge-erro text-sm px-4 py-1.5 cursor-pointer hover:opacity-80 transition-opacity">
               Avançado
             </button>
           }
@@ -149,35 +149,38 @@
             <span class="text-xs font-medium text-texto text-center leading-tight">Explorar Cursos</span>
           </a>
 
+          <!-- Atalhos para rotas que existem de verdade. Os antigos vinham do
+               site de um cliente específico e dois deles não levavam a lugar
+               nenhum. -->
           <a (click)="irParaCursos('BASICO')"
             class="flex flex-col items-center gap-3 bg-superficie rounded-2xl py-6 px-3 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all cursor-pointer no-underline group">
-            <div class="w-14 h-14 bg-green-500 rounded-2xl flex items-center justify-center group-hover:bg-green-600 transition-colors">
+            <div class="w-14 h-14 bg-sucesso rounded-2xl flex items-center justify-center group-hover:bg-sucesso-escuro transition-colors">
               <mat-icon class="text-white">trending_up</mat-icon>
             </div>
-            <span class="text-xs font-medium text-texto text-center leading-tight">Gratuidade Senac</span>
+            <span class="text-xs font-medium text-texto text-center leading-tight">Para Iniciantes</span>
           </a>
 
-          <a (click)="irParaCursos()"
+          <a routerLink="/unidades"
             class="flex flex-col items-center gap-3 bg-superficie rounded-2xl py-6 px-3 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all cursor-pointer no-underline group">
-            <div class="w-14 h-14 bg-marca rounded-2xl flex items-center justify-center group-hover:bg-marca transition-colors">
-              <mat-icon class="text-white">calculate</mat-icon>
+            <div class="w-14 h-14 bg-marca rounded-2xl flex items-center justify-center group-hover:bg-marca-escura transition-colors">
+              <mat-icon class="text-white">location_city</mat-icon>
             </div>
-            <span class="text-xs font-medium text-texto text-center leading-tight">Simulador de Preço</span>
+            <span class="text-xs font-medium text-texto text-center leading-tight">Unidades</span>
           </a>
 
-          <a routerLink="/login"
+          <a routerLink="/sobre"
             class="flex flex-col items-center gap-3 bg-superficie rounded-2xl py-6 px-3 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all cursor-pointer no-underline group">
-            <div class="w-14 h-14 bg-destaque rounded-2xl flex items-center justify-center group-hover:bg-destaque transition-colors">
+            <div class="w-14 h-14 bg-destaque rounded-2xl flex items-center justify-center group-hover:bg-destaque-escuro transition-colors">
               <mat-icon class="text-white">contact_mail</mat-icon>
             </div>
-            <span class="text-xs font-medium text-texto text-center leading-tight">Quero um Orçamento</span>
+            <span class="text-xs font-medium text-texto text-center leading-tight">Sobre</span>
           </a>
 
         </div>
       </div>
     </section>
 
-    <!-- ===== BANNER "SENAC NA MINHA HISTÓRIA" ===== -->
+    <!-- ===== BANNER INSTITUCIONAL (texto vem da marca configurada) ===== -->
     <section class="py-10 bg-superficie">
       <div class="max-w-6xl mx-auto px-6">
         <div class="relative rounded-3xl overflow-hidden bg-gradient-to-br from-marca-profunda via-marca-escura to-marca">
@@ -197,13 +200,14 @@
           <div class="relative flex flex-col lg:flex-row items-center justify-between p-8 lg:p-12 gap-8">
             <!-- Left text -->
             <div class="text-white max-w-md">
-              <span class="text-destaque text-xs font-semibold uppercase tracking-widest">Senac SP</span>
+              <span class="text-destaque text-xs font-semibold uppercase tracking-widest">{{ marca.nome() }}</span>
               <h2 class="text-3xl lg:text-4xl font-bold mt-2 mb-4 leading-tight">
-                Senac na<br>Minha História
+                Sua próxima<br>conquista começa aqui
               </h2>
-              <p class="text-blue-200 text-base mb-6 leading-relaxed">
-                Mais de 70 anos transformando vidas por meio da educação profissional.
-                Venha fazer parte dessa história e construa seu futuro conosco.
+              <p class="text-white/75 text-base mb-6 leading-relaxed">
+                @if (marca.assinatura()) { {{ marca.assinatura() }}. }
+                Escolha entre os cursos disponíveis, acompanhe seu progresso e conquiste
+                seu certificado.
               </p>
               <a routerLink="/cursos"
                 class="inline-flex items-center gap-2 bg-superficie text-marca font-bold px-6 py-3 rounded-xl hover:bg-marca-suave transition-colors no-underline text-sm">
@@ -213,22 +217,25 @@
             </div>
 
             <!-- Right: stats -->
+            <!-- Números reais vindos da API. Os antigos ("70+ anos", "100k+
+                 alunos", "SP") eram do cliente original e ficariam falsos em
+                 qualquer outra instalação. -->
             <div class="hidden lg:grid grid-cols-2 gap-4 shrink-0">
               <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 text-center text-white">
-                <div class="text-3xl font-extrabold text-destaque">70+</div>
-                <div class="text-blue-200 text-xs mt-1 font-medium">Anos de história</div>
+                <div class="text-3xl font-extrabold text-destaque">{{ totalCursos() }}</div>
+                <div class="text-white/75 text-xs mt-1 font-medium">Cursos disponíveis</div>
               </div>
               <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 text-center text-white">
-                <div class="text-3xl font-extrabold">{{ totalCursos() }}+</div>
-                <div class="text-blue-200 text-xs mt-1 font-medium">Cursos disponíveis</div>
+                <div class="text-3xl font-extrabold">{{ areas().length }}</div>
+                <div class="text-white/75 text-xs mt-1 font-medium">Áreas de conhecimento</div>
               </div>
               <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 text-center text-white">
-                <div class="text-3xl font-extrabold">100k+</div>
-                <div class="text-blue-200 text-xs mt-1 font-medium">Alunos formados</div>
+                <div class="text-3xl font-extrabold">{{ totalUnidades() }}</div>
+                <div class="text-white/75 text-xs mt-1 font-medium">Unidades</div>
               </div>
               <div class="bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 text-center text-white">
-                <div class="text-3xl font-extrabold text-destaque">SP</div>
-                <div class="text-blue-200 text-xs mt-1 font-medium">Presença em todo estado</div>
+                <div class="text-3xl font-extrabold text-destaque">100%</div>
+                <div class="text-white/75 text-xs mt-1 font-medium">Online, a qualquer hora</div>
               </div>
             </div>
           </div>
@@ -307,7 +314,7 @@
                 class="bg-superficie rounded-2xl border border-borda shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all cursor-pointer overflow-hidden group flex">
                 <div class="w-1.5 shrink-0" [class]="'bg-gradient-to-b ' + getNivelBg(c.nivel)"></div>
                 <div class="p-4 flex-1">
-                  <span [class]="getNivelClass(c.nivel)" class="px-2 py-0.5 rounded-full text-xs font-semibold">
+                  <span [class]="getNivelClass(c.nivel)" class="lms-badge">
                     {{ c.nivel === 'BASICO' ? 'Básico' : c.nivel === 'INTERMEDIARIO' ? 'Intermediário' : 'Avançado' }}
                   </span>
                   <h3 class="font-semibold text-texto text-sm mt-2 group-hover:text-marca transition-colors"
@@ -353,7 +360,7 @@
                   </div>
                 </div>
                 <div class="p-4">
-                  <h3 class="font-semibold text-texto text-sm group-hover:text-marca transition-colors">Senac {{ c.unidadeNome }}</h3>
+                  <h3 class="font-semibold text-texto text-sm group-hover:text-marca transition-colors">{{ c.unidadeNome }}</h3>
                   <p class="text-texto-suave text-xs mt-0.5">Unidade disponível</p>
                   <a [routerLink]="['/cursos']" [queryParams]="{ unidadeId: c.unidadeId }"
                     class="mt-3 inline-flex items-center gap-1 text-xs text-marca font-semibold hover:underline no-underline">
@@ -366,29 +373,14 @@
           </div>
         }
 
-        <!-- Static fallback if no units in courses -->
+        <!-- Sem unidades: estado vazio honesto. Antes havia três cartões falsos
+             com nomes de cidades do cliente original, indistinguíveis de dados
+             reais para quem estivesse vendo a instalação de outro cliente. -->
         @if (!loading() && unidadesDestaque().length === 0) {
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
-            @for (placeholder of [
-              {nome:'São Paulo Centro', regiao:'Região Centro'},
-              {nome:'Santo André', regiao:'Região ABC'},
-              {nome:'Campinas', regiao:'Região Metropolitana'}
-              ]; track placeholder) {
-              <div
-                class="bg-superficie rounded-2xl overflow-hidden shadow-card border border-borda">
-                <div class="h-36 bg-gradient-to-br from-marca-escura to-marca flex items-center justify-center relative">
-                  <mat-icon class="text-white/20" style="font-size:80px;height:80px;width:80px">location_city</mat-icon>
-                  <div class="absolute bottom-3 left-4 flex items-center gap-1 text-white">
-                    <mat-icon style="font-size:14px;height:14px;width:14px">location_on</mat-icon>
-                    <span class="text-xs font-medium">{{ placeholder.nome }}</span>
-                  </div>
-                </div>
-                <div class="p-4">
-                  <h3 class="font-semibold text-texto text-sm">Senac {{ placeholder.nome }}</h3>
-                  <p class="text-texto-suave text-xs mt-0.5">{{ placeholder.regiao }}</p>
-                </div>
-              </div>
-            }
+          <div class="bg-superficie rounded-2xl border border-dashed border-borda p-12 text-center mb-8">
+            <mat-icon class="text-texto-suave" style="font-size:48px;height:48px;width:48px">location_city</mat-icon>
+            <p class="text-texto font-medium mt-3">Nenhuma unidade cadastrada ainda</p>
+            <p class="text-texto-suave text-sm mt-1">As unidades aparecem aqui assim que forem cadastradas no painel.</p>
           </div>
         }
 
@@ -428,51 +420,40 @@
       <div class="max-w-6xl mx-auto px-6 py-14">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
 
-          <!-- Col 1: Logo + description -->
+          <!-- Col 1: Logo + assinatura, ambos vindos da marca configurada -->
           <div class="md:col-span-1">
-            <div class="flex items-center gap-2.5 mb-4">
-              <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                <mat-icon class="text-white">school</mat-icon>
-              </div>
-              <span class="text-lg font-bold">Senac <span class="text-destaque">LMS</span></span>
+            <div class="mb-4">
+              <app-logo-marca sobre="marca" tamanho="md"></app-logo-marca>
             </div>
-            <p class="text-blue-200 text-sm leading-relaxed mb-4">
-              Sistema de Gestão de Cursos Profissionais desenvolvido como portfólio.
-            </p>
-            <div class="flex gap-3">
-              <a href="#" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors cursor-pointer">
-                <mat-icon style="font-size:16px;height:16px;width:16px">language</mat-icon>
-              </a>
-              <a href="#" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors cursor-pointer">
-                <mat-icon style="font-size:16px;height:16px;width:16px">code</mat-icon>
-              </a>
-            </div>
+            @if (marca.assinatura()) {
+              <p class="text-white/75 text-sm leading-relaxed mb-4">{{ marca.assinatura() }}</p>
+            }
           </div>
 
           <!-- Col 2: Cursos -->
           <div>
-            <h4 class="text-sm font-semibold uppercase tracking-wider text-blue-200 mb-4">Cursos</h4>
+            <h4 class="text-sm font-semibold uppercase tracking-wider text-white/75 mb-4">Cursos</h4>
             <ul class="space-y-2.5">
               <li>
                 <button (click)="irParaCursos('BASICO')"
-                  class="text-blue-200 hover:text-white text-sm transition-colors cursor-pointer bg-transparent border-0 p-0">
+                  class="text-white/75 hover:text-white text-sm transition-colors cursor-pointer bg-transparent border-0 p-0">
                   Nível Básico
                 </button>
               </li>
               <li>
                 <button (click)="irParaCursos('INTERMEDIARIO')"
-                  class="text-blue-200 hover:text-white text-sm transition-colors cursor-pointer bg-transparent border-0 p-0">
+                  class="text-white/75 hover:text-white text-sm transition-colors cursor-pointer bg-transparent border-0 p-0">
                   Nível Intermediário
                 </button>
               </li>
               <li>
                 <button (click)="irParaCursos('AVANCADO')"
-                  class="text-blue-200 hover:text-white text-sm transition-colors cursor-pointer bg-transparent border-0 p-0">
+                  class="text-white/75 hover:text-white text-sm transition-colors cursor-pointer bg-transparent border-0 p-0">
                   Nível Avançado
                 </button>
               </li>
               <li>
-                <a routerLink="/cursos" class="text-blue-200 hover:text-white text-sm transition-colors no-underline">
+                <a routerLink="/cursos" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
                   Todos os Cursos
                 </a>
               </li>
@@ -481,39 +462,51 @@
 
           <!-- Col 3: Área do Aluno -->
           <div>
-            <h4 class="text-sm font-semibold uppercase tracking-wider text-blue-200 mb-4">Área do Aluno</h4>
+            <h4 class="text-sm font-semibold uppercase tracking-wider text-white/75 mb-4">Área do Aluno</h4>
             <ul class="space-y-2.5">
               <li>
-                <a routerLink="/login" class="text-blue-200 hover:text-white text-sm transition-colors no-underline">
+                <a routerLink="/login" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
                   Fazer Login
                 </a>
               </li>
               <li>
-                <a routerLink="/login" class="text-blue-200 hover:text-white text-sm transition-colors no-underline">
+                <a routerLink="/login" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
                   Criar Conta
                 </a>
               </li>
               <li>
-                <a routerLink="/login" class="text-blue-200 hover:text-white text-sm transition-colors no-underline">
+                <a routerLink="/login" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
                   Minhas Matrículas
                 </a>
               </li>
               <li>
-                <a routerLink="/login" class="text-blue-200 hover:text-white text-sm transition-colors no-underline">
+                <a routerLink="/login" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
                   Meu Progresso
                 </a>
               </li>
             </ul>
           </div>
 
-          <!-- Col 4: Sobre -->
+          <!-- Col 4: Institucional. Era a stack técnica do projeto — informação
+               de portfólio, que não faz sentido no rodapé público de um produto. -->
           <div>
-            <h4 class="text-sm font-semibold uppercase tracking-wider text-blue-200 mb-4">Sobre o Projeto</h4>
-            <ul class="space-y-2.5 text-blue-200 text-sm">
-              <li>Java 17 + Spring Boot 3</li>
-              <li>Angular 18 + Tailwind CSS</li>
-              <li>JWT Authentication</li>
-              <li>PostgreSQL + Flyway</li>
+            <h4 class="text-sm font-semibold uppercase tracking-wider text-white/75 mb-4">Institucional</h4>
+            <ul class="space-y-2.5">
+              <li>
+                <a routerLink="/sobre" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
+                  Sobre
+                </a>
+              </li>
+              <li>
+                <a routerLink="/unidades" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
+                  Unidades
+                </a>
+              </li>
+              <li>
+                <a routerLink="/cursos/areas" class="text-white/75 hover:text-white text-sm transition-colors no-underline">
+                  Áreas de conhecimento
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -521,10 +514,10 @@
 
         <!-- Bottom bar -->
         <div class="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p class="text-blue-200 text-xs">
-            © {{ year }} Senac LMS · Desenvolvido como portfólio para vaga Programador Java Jr
+          <p class="text-white/75 text-xs">
+            © {{ year }} {{ marca.nome() }}@if (marca.assinatura()) { · {{ marca.assinatura() }} }
           </p>
-          <div class="flex items-center gap-2 text-blue-200 text-xs">
+          <div class="flex items-center gap-2 text-white/75 text-xs">
             <span class="w-2 h-2 bg-sucesso rounded-full animate-pulse"></span>
             Sistema em funcionamento
           </div>

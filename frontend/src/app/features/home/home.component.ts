@@ -5,21 +5,25 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { MarcaService } from '../../core/services/marca.service';
 import { CursoService, Curso, Area } from '../../core/services/curso.service';
+import { LogoMarcaComponent } from '../../shared/logo-marca/logo-marca.component';
 
 @Component({
     selector: 'app-home',
-    imports: [RouterModule, MatIconModule, MatProgressSpinnerModule],
+    imports: [RouterModule, MatIconModule, MatProgressSpinnerModule, LogoMarcaComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
     templateUrl: './home.component.html'
 })
 export class HomeComponent implements OnInit {
   auth = inject(AuthService);
+  readonly marca = inject(MarcaService);
   private cursoService = inject(CursoService);
   private router = inject(Router);
 
   cursosDestaque = signal<Curso[]>([]);
   totalCursos = signal(0);
+  totalUnidades = signal(0);
   loading = signal(true);
   pesquisa = signal('');
   areas = signal<Area[]>([]);
@@ -38,12 +42,16 @@ export class HomeComponent implements OnInit {
     }
     forkJoin({
       cursos: this.cursoService.listarCursos(0),
-      areas: this.cursoService.listarAreas()
+      areas: this.cursoService.listarAreas(),
+      // Os números do banner institucional passaram a ser reais; a contagem de
+      // unidades não vinha em nenhuma das duas chamadas anteriores.
+      unidades: this.cursoService.listarTodasUnidades()
     }).subscribe({
-      next: ({ cursos, areas }) => {
+      next: ({ cursos, areas, unidades }) => {
         this.cursosDestaque.set(cursos.content);
         this.totalCursos.set(cursos.page.totalElements);
         this.areas.set(areas);
+        this.totalUnidades.set(unidades.length);
         this.loading.set(false);
       },
       error: () => this.loading.set(false)
@@ -62,11 +70,11 @@ export class HomeComponent implements OnInit {
 
   getNivelClass(nivel: string): string {
     const map: Record<string, string> = {
-      'BASICO': 'bg-green-100 text-sucesso',
-      'INTERMEDIARIO': 'bg-yellow-100 text-aviso',
-      'AVANCADO': 'bg-red-100 text-erro'
+      BASICO: 'lms-badge-sucesso',
+      INTERMEDIARIO: 'lms-badge-aviso',
+      AVANCADO: 'lms-badge-erro'
     };
-    return map[nivel] || 'bg-superficie-2 text-texto';
+    return map[nivel] || 'lms-badge-neutro';
   }
 
   getNivelBg(nivel: string): string {

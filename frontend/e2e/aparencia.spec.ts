@@ -106,7 +106,7 @@ test.describe('aparência e temas', () => {
 
     const marca = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('lms_tema')!).claro.cores.marca);
-    expect(marca.toLowerCase()).toBe('#0054a6');
+    expect(marca.toLowerCase()).toBe('#2563eb');
   });
 
   test('a prévia mostra o hover com a cor configurada', async ({ page }) => {
