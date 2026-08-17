@@ -1,8 +1,11 @@
-# Claude (arquivos internos, não versionados)
+# Claude — configuração local da ferramenta, não versionada.
+# CLAUDE.md NÃO entra aqui: é a documentação de contexto do projeto (sucessora
+# do CONTEXTO_PROJETO.md), lida automaticamente por agentes no início de cada
+# sessão. Ignorá-la faria com que um clone novo perdesse justamente o arquivo
+# que existe para dar contexto.
 .claude/
 **/.claude/
 .claude.json
-CLAUDE.md
 
 # Backend
 backend/target/

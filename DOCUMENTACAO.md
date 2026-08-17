@@ -1,7 +1,10 @@
-# Documentação Técnica — LMS Lite
+# Documentação Técnica — LMS
 
 > Referência técnica para desenvolvedores e mantenedores.
-> Atualizada em: 2026-08-09 | Backend: Spring Boot 4.1.0 (Java 25 LTS) / Frontend: Angular 22 (zoneless)
+> Atualizada em: 2026-08-17 | Backend: Spring Boot 4.1.0 (Java 25 LTS) / Frontend: Angular 22 (zoneless)
+>
+> Para trabalhar **dentro** do código (convenções, decisões e armadilhas), veja
+> [`CLAUDE.md`](./CLAUDE.md). Este arquivo é a referência de **o que existe**.
 
 ---
 
@@ -15,15 +18,17 @@
 6. [Frontend — Angular](#6-frontend--angular)
 7. [Módulo de Acessibilidade](#7-módulo-de-acessibilidade)
 8. [Segurança e Autenticação](#8-segurança-e-autenticação)
-9. [Upload de Imagens](#9-upload-de-imagens)
-10. [Decisões de Arquitetura](#10-decisões-de-arquitetura)
-11. [Como Rodar Localmente](#11-como-rodar-localmente)
+9. [Upload de Arquivos](#9-upload-de-arquivos)
+10. [Aparência e White-label](#10-aparência-e-white-label)
+11. [Decisões de Arquitetura](#11-decisões-de-arquitetura)
+12. [Testes](#12-testes)
+13. [Como Rodar Localmente](#13-como-rodar-localmente)
 
 ---
 
 ## 1. Visão Geral
 
-LMS Lite é um sistema fullstack de gestão de cursos educacionais desenvolvido como projeto de portfólio. Implementa um ciclo completo de LMS: catálogo de cursos por área/categoria/tipo, matrículas, progresso de alunos, lançamento de notas, controle de presença, gestão de regiões/unidades e painel administrativo com gráficos em tempo real. O sistema tem foco em acessibilidade, com um módulo dedicado que cobre critérios WCAG 2.1 AA/AAA.
+LMS é uma plataforma fullstack de gestão de cursos educacionais, white-label: a identidade visual (nome, logotipo, paleta e tipografia) é configuração de cada instalação, definida pela tela de Aparência e persistida no servidor. Implementa um ciclo completo de LMS: catálogo de cursos por área/categoria/tipo, matrículas, progresso de alunos, lançamento de notas, controle de presença, gestão de regiões/unidades e painel administrativo com gráficos em tempo real. O sistema tem foco em acessibilidade, com um módulo dedicado que cobre critérios WCAG 2.1 AA/AAA.
 
 | Funcionalidade | Status |
 |---|---|
@@ -38,12 +43,18 @@ LMS Lite é um sistema fullstack de gestão de cursos educacionais desenvolvido 
 | Gestão de Regiões e Unidades | ✅ Implementado |
 | Página de detalhe de Unidade com slug | ✅ Implementado |
 | Vínculo Professor ↔ Curso | ✅ Implementado |
-| Upload de imagens (avatar, curso, unidade) | ✅ Implementado |
+| Upload de imagens (avatar, curso, unidade, logotipo) | ✅ Implementado |
+| Vídeo por módulo — upload de arquivo ou link YouTube/Vimeo | ✅ Implementado |
+| Busca textual em cursos | ✅ Implementado |
+| Notificações in-app (polling) | ✅ Implementado |
 | Dashboard administrativo com Chart.js + GSAP | ✅ Implementado |
 | Widget de Acessibilidade (12 funcionalidades) | ✅ Implementado |
 | VLibras (tradução para Libras) | ✅ Implementado |
-| Seed: 4 regiões, 64 unidades Senac SP, 35 cursos | ✅ Implementado |
-| Testes automatizados backend/frontend | 🔲 Planejado |
+| **White-label: identidade da instalação no servidor** | ✅ Implementado |
+| **White-label: paleta e tipografia no servidor** | ✅ Implementado |
+| **Edição do admin em páginas dedicadas** | ✅ Implementado |
+| Seed de exemplo: 4 regiões, 64 unidades, 35 cursos | ✅ Implementado |
+| Testes automatizados backend (94 ITs) e frontend (73 specs + 30 E2E) | ✅ Implementado |
 | Deploy em produção | 🔲 Planejado |
 | Certificados de conclusão | 🔲 Planejado |
 
@@ -111,12 +122,22 @@ br/com/lms/
 │   │   ├── Modulo.java          # @Entity — titulo, ordem, aulas (OneToMany)
 │   │   ├── CursoController.java # GET/POST/PUT/DELETE /api/cursos
 │   │   └── CursoRepository.java
+│   ├── marca/                   # White-label — identidade e tema da instalação
+│   │   ├── ConfiguracaoMarca.java       # @Entity de linha única (id fixo = 1)
+│   │   ├── ConfiguracaoMarcaRepository.java
+│   │   ├── MarcaService.java            # leitura cacheada; escrita invalida
+│   │   └── MarcaController.java         # GET público; PUT/POST/DELETE ADMIN
 │   ├── matricula/
 │   │   ├── Matricula.java       # @Entity — Status (EM_ANDAMENTO|CONCLUIDO|CANCELADO), nota, aprovado
 │   │   ├── MatriculaController.java
 │   │   ├── MatriculaRepository.java
 │   │   ├── ProgressoAula.java   # @Entity — matricula, aula, concluida, concluido_em
 │   │   └── ProgressoAulaRepository.java
+│   ├── notificacao/
+│   │   ├── Notificacao.java     # @Entity — tipo, mensagem, referenciaId, lida
+│   │   ├── NotificacaoService.java      # criada dentro das transações de matrícula/nota
+│   │   ├── NotificacaoController.java
+│   │   └── NotificacaoRepository.java
 │   ├── presenca/
 │   │   ├── PresencaAula.java    # unique (matricula_id, aula_id, data_aula)
 │   │   ├── PresencaAulaRepository.java
@@ -134,15 +155,21 @@ br/com/lms/
 │   │   ├── RegiaoRepository.java
 │   │   └── UnidadeRepository.java
 │   ├── upload/
-│   │   ├── UploadController.java   # POST /api/upload/avatar|curso/{id}|unidade/{id}
-│   │   └── UploadService.java      # Salva JPEG/PNG/WebP em lms-uploads/, retorna URL
+│   │   ├── UploadController.java   # POST /api/upload/avatar|curso/{id}|unidade/{id}|modulo/{id}/video
+│   │   ├── UploadService.java      # Valida tipo/tamanho (imagem e vídeo)
+│   │   ├── StorageBackend.java     # Interface de I/O cru de arquivo
+│   │   ├── LocalStorageBackend.java# Grava em lms-uploads/, devolve URL absoluta
+│   │   ├── ImagemUploadService.java# Amarra o arquivo à entidade, em transação
+│   │   └── VideoUploadService.java # Vídeo de módulo (upload e remoção)
 │   └── usuario/
 │       ├── Usuario.java         # @Entity — Role (ADMIN|PROFESSOR|ALUNO), avatarUrl
 │       ├── AuthController.java  # POST /api/auth/login|register
+│       ├── DevAdminSeeder.java  # @Profile("dev") — admin local de conveniência
 │       ├── UsuarioController.java
 │       └── UsuarioRepository.java
 ├── dto/
-│   └── DTOs.java                # Todos os records (request + response) em um arquivo
+│   ├── DTOs.java                # Todos os records (request + response) em um arquivo
+│   └── validation/              # @ValidVideoModulo + validador do par urlVideo/tipoVideo
 ├── exception/
 │   ├── GlobalExceptionHandler.java
 │   └── ResourceNotFoundException.java
@@ -168,21 +195,29 @@ app/
 │   └── vlibras.d.ts               # Tipos do widget VLibras do gov.br
 ├── core/
 │   ├── guards/
-│   │   └── auth.guard.ts          # CanActivateFn → isLoggedIn()
+│   │   └── auth.guard.ts          # authGuard / adminGuard / professorGuard
 │   ├── interceptors/
 │   │   ├── jwt.interceptor.ts     # Injeta Bearer token em todas as requests
-│   │   └── error.interceptor.ts   # Tratamento global de erros HTTP
+│   │   └── error.interceptor.ts   # Erros HTTP + mensagemDeErro() (RFC 7807)
 │   └── services/
 │       ├── auth.service.ts        # signal currentUser, login/logout/refreshUser
 │       ├── curso.service.ts       # Todos os métodos de API
-│       └── upload.service.ts      # uploadAvatar, uploadCurso, uploadUnidade
+│       ├── marca.service.ts       # White-label: identidade + busca do tema
+│       ├── tema.service.ts        # Aplica paleta/tipografia em custom properties
+│       ├── notificacao.service.ts # Polling de notificações (30s)
+│       └── upload.service.ts      # avatar, curso, unidade, vídeo de módulo
 ├── features/
 │   ├── admin/
-│   │   ├── cursos/                # CRUD cursos + painel Alunos & Notas
+│   │   ├── cursos/                # Listagem + painel Alunos & Notas
+│   │   │   └── curso-form/        # Página dedicada de criação/edição
 │   │   ├── dashboard/             # KPIs + Chart.js (bar, doughnut, horizontal) + GSAP
 │   │   ├── professores/           # Listagem + vínculo professor ↔ curso
-│   │   ├── regioes/               # CRUD regiões + unidades (MatExpansionPanel)
-│   │   └── usuarios/              # CRUD usuários com edição inline
+│   │   ├── regioes/               # Listagem de regiões + unidades (MatExpansionPanel)
+│   │   │   ├── regiao-form/       # Página dedicada de região
+│   │   │   └── unidade-form/      # Página dedicada de unidade
+│   │   └── usuarios/              # Listagem + criação rápida
+│   │       └── usuario-form/      # Página dedicada de edição
+│   ├── aparencia/                 # White-label: identidade, cores e tipografia
 │   ├── areas/
 │   │   ├── detalhe-area/
 │   │   ├── lista-areas/
@@ -205,9 +240,14 @@ app/
 │       └── cursos-unidade-tipo/
 └── shared/
     ├── curso-card/          # Card reutilizável para listagem de cursos
-    ├── image-upload/        # Componente de upload de imagem com preview
+    ├── image-upload/        # Upload de imagem com preview (circle | circle-lg | rect | hero)
+    ├── logo-marca/          # Assinatura visual do cliente (logo + nome)
     ├── navbar/              # Top bar fixa + sidebar colapsável (autenticados)
-    └── public-nav/          # Navbar pública com mega-dropdown
+    ├── notificacao-sino/    # Badge + dropdown de notificações
+    ├── public-nav/          # Navbar pública com mega-dropdown
+    ├── video-embed/         # iframe de YouTube/Vimeo + util de detecção
+    ├── video-upload/        # Upload de vídeo com progresso
+    └── vlibras/             # Widget VLibras (gov.br)
 ```
 
 ---
@@ -229,12 +269,24 @@ app/
 | `V9__add_unidade_curso.sql` | Coluna `unidade_id` (nullable FK) em `cursos` |
 | `V10__create_areas_tipos_categorias.sql` | Tabelas `areas`, `categorias`, `tipos`, `curso_categorias`, `curso_tipos` |
 | `V11__seed_areas_tipos_categorias.sql` | Seed: 10 áreas, 44 categorias, 11 tipos; associações nos cursos 1 e 2 |
-| `V12__seed_rico_cursos_unidades.sql` | Seed: 4 regiões, 64 unidades Senac SP, 35 cursos com vínculos |
+| `V12__seed_rico_cursos_unidades.sql` | Seed de exemplo: 4 regiões, 64 unidades, 35 cursos com vínculos |
 | `V13__add_slug_unidades.sql` | Adiciona coluna `slug` em `unidades`, popula via transliteração SQL, índice UNIQUE |
 | `V14__fix_slugs_unidades.sql` | Corrige 14 slugs com erro de mapeamento gerados pela V13 |
 | `V15__add_imagem_fields.sql` | Adiciona `avatar_url` em `usuarios`, `imagem_url` em `cursos` e `unidades` |
+| `V16__add_area_curso.sql` | Coluna `area_id` em `cursos` (vínculo direto curso ↔ área) |
+| `V17__add_indices_fk.sql` | 15 índices de FK (o Postgres não indexa FK automaticamente) + índice parcial `cursos(criado_em DESC) WHERE ativo` |
+| `V18__add_busca_textual.sql` | Suporte a busca textual em cursos |
+| `V19__create_notificacoes.sql` | Tabela `notificacoes` + índice `(usuario_id, lida, criado_em DESC)` |
+| `V20__add_video_modulo.sql` | Coluna `url_video` em `modulos` |
+| `V21__add_tipo_video_modulo.sql` | Coluna `tipo_video` (ARQUIVO/YOUTUBE/VIMEO) em `modulos` |
+| `V22__create_configuracao_marca.sql` | Tabela `configuracao_marca` (linha única, `CHECK id = 1`) — identidade da instalação |
+| `V23__add_tema_configuracao_marca.sql` | Coluna `tema` (jsonb, nullable) — paleta e tipografia da instalação |
+| `V24__remove_marca_do_seed_unidades.sql` | Remove a marca do cliente original dos dados de exemplo |
 
-**Próxima migration disponível: V16.**
+**Próxima migration disponível: V25.**
+
+⚠️ Nunca edite uma migration já aplicada: o Flyway faz checksum do arquivo e a
+validação passa a falhar em toda instalação existente. Corrija com uma nova.
 
 ### Schema atual
 
@@ -256,6 +308,8 @@ app/
 | `tipos` | id, nome, slug | slug UNIQUE |
 | `curso_categorias` | curso_id, categoria_id | PK composta N:N |
 | `curso_tipos` | curso_id, tipo_id | PK composta N:N |
+| `notificacoes` | id, usuario_id, tipo, mensagem, referencia_id, lida, criado_em | índice (usuario_id, lida, criado_em DESC) |
+| `configuracao_marca` | id, nome, assinatura, logo_url, logo_inverso_url, tema, atualizado_em | linha única (`CHECK id = 1`); `tema` jsonb nullable |
 
 ### Diagrama de relacionamentos (simplificado)
 
@@ -263,6 +317,7 @@ app/
 regioes      ||--o{ unidades        : "contém"
 unidades     ||--o{ usuarios        : "lotado em"
 unidades     ||--o{ cursos          : "oferece"
+usuarios     ||--o{ notificacoes    : "recebe"
 usuarios     ||--o{ matriculas      : "faz"
 cursos       ||--o{ matriculas      : "recebe"
 cursos       ||--o{ modulos         : "tem"
@@ -444,6 +499,24 @@ Teto de `size` = 100 (`spring.data.web.pageable.max-page-size`); padrão = 20.
 | GET | `/api/presenca/matricula/{id}` | auth | Presenças de uma matrícula |
 | GET | `/api/presenca/matricula/{id}/resumo` | auth | Resumo percentual de presença |
 
+### Aparência / White-label (`/api/marca`)
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| GET | `/api/marca` | **público** | Identidade + tema da instalação |
+| PUT | `/api/marca` | ADMIN | Nome e assinatura |
+| POST | `/api/marca/logo/{PRINCIPAL\|INVERSO}` | ADMIN | Upload de logotipo (multipart) |
+| DELETE | `/api/marca/logo/{variante}` | ADMIN | Remove o logotipo |
+| PUT | `/api/marca/tema` | ADMIN | Paleta (14 tokens) + tipografia dos dois modos |
+| DELETE | `/api/marca/tema` | ADMIN | Restaura o tema de fábrica |
+
+O GET é público por necessidade: a tela de login exibe nome e logotipo do
+cliente antes de existir sessão. Leitura cacheada (cache `marca`); toda escrita
+invalida. `tema` nulo na resposta = instalação nunca customizada.
+
+Cores são validadas contra `^#[0-9A-Fa-f]{6}$` — os valores viram custom
+properties CSS no cliente, então string livre permitiria injeção de CSS.
+
 ### Upload (`/api/upload`)
 
 | Método | Rota | Auth | Descrição |
@@ -452,8 +525,15 @@ Teto de `size` = 100 (`spring.data.web.pageable.max-page-size`); padrão = 20.
 | POST | `/api/upload/curso/{cursoId}` | ADMIN | Upload de imagem de curso |
 | POST | `/api/upload/unidade/{unidadeId}` | ADMIN | Upload de imagem de unidade |
 
-Formatos aceitos: JPEG, PNG, WebP. Limite: 5 MB por arquivo.
+| POST | `/api/upload/modulo/{moduloId}/video` | ADMIN/PROFESSOR | Upload de vídeo de módulo |
+| DELETE | `/api/upload/modulo/{moduloId}/video` | ADMIN/PROFESSOR | Remove o vídeo do módulo |
+
+Imagens: JPEG, PNG, WebP. Vídeos: MP4, WebM, OGG (teto em
+`app.upload.video-max-size-mb`, padrão 300 MB).
 Arquivos servidos via `GET /uploads/**` (público, sem autenticação).
+
+**SVG não é aceito** em nenhum upload de imagem: é documento capaz de carregar
+script e os uploads são servidos como estáticos — seria XSS armazenado.
 
 ---
 
@@ -479,14 +559,26 @@ Arquivos servidos via `GET /uploads/**` (público, sem autenticação).
 | `/cursos/:id` | `DetalheCursoComponent` | — |
 | `/dashboard` | `DashboardComponent` | `authGuard` |
 | `/matriculas` | `MinhasMatriculasComponent` | `authGuard` |
+| `/aparencia` | `AparenciaComponent` | `authGuard` |
 | `/admin` | redirect `/admin/dashboard` | — |
-| `/admin/dashboard` | `AdminDashboardComponent` | `authGuard` |
-| `/admin/cursos` | `AdminCursosComponent` | `authGuard` |
-| `/admin/usuarios` | `AdminUsuariosComponent` | `authGuard` |
-| `/admin/regioes` | `AdminRegioesComponent` | `authGuard` |
-| `/admin/professores` | `AdminProfessoresComponent` | `authGuard` |
+| `/admin/dashboard` | `AdminDashboardComponent` | `adminGuard` |
+| `/admin/cursos` | `AdminCursosComponent` | `adminGuard` |
+| `/admin/cursos/novo` | `AdminCursoFormComponent` | `adminGuard` |
+| `/admin/cursos/:id/editar` | `AdminCursoFormComponent` | `adminGuard` |
+| `/admin/usuarios` | `AdminUsuariosComponent` | `adminGuard` |
+| `/admin/usuarios/:id/editar` | `AdminUsuarioFormComponent` | `adminGuard` |
+| `/admin/regioes` | `AdminRegioesComponent` | `adminGuard` |
+| `/admin/regioes/nova` | `AdminRegiaoFormComponent` | `adminGuard` |
+| `/admin/regioes/:id/editar` | `AdminRegiaoFormComponent` | `adminGuard` |
+| `/admin/regioes/:regiaoId/unidades/nova` | `AdminUnidadeFormComponent` | `adminGuard` |
+| `/admin/regioes/:regiaoId/unidades/:unidadeId/editar` | `AdminUnidadeFormComponent` | `adminGuard` |
+| `/admin/professores` | `AdminProfessoresComponent` | `adminGuard` |
 | `/professor` | redirect `/professor/cursos` | — |
-| `/professor/cursos` | `ProfessorCursosComponent` | `authGuard` |
+| `/professor/cursos` | `ProfessorCursosComponent` | `professorGuard` |
+
+Rotas mais específicas (`novo`/`nova`) vêm antes das paramétricas de mesma
+profundidade. Todo "Editar" do admin leva a **página dedicada**, nunca a
+formulário embutido na listagem.
 | `/**` | redirect `/home` | — |
 
 ### Services
@@ -495,7 +587,10 @@ Arquivos servidos via `GET /uploads/**` (público, sem autenticação).
 |---|---|
 | `AuthService` | `signal<AuthResponse\|null> currentUser`, login/logout, `refreshUser()` no startup |
 | `CursoService` | Todos os métodos de API: cursos, áreas, tipos, matrículas, usuários, regiões, unidades, professores, conteúdos, presença, nota |
-| `UploadService` | `uploadAvatar()`, `uploadCurso()`, `uploadUnidade()` via multipart FormData |
+| `UploadService` | `uploadAvatar()`, `uploadCurso()`, `uploadUnidade()`, `uploadModuloVideo()` (com progresso), `removerVideoModulo()` |
+| `MarcaService` | Identidade da instalação; faz o `GET /api/marca` e repassa o tema ao `TemaService` |
+| `TemaService` | Aplica paleta/tipografia como custom properties `--tema-*` no `<html>`; guarda o modo do usuário |
+| `NotificacaoService` | Polling de 30s da contagem de não lidas; lista sob demanda |
 
 ### AuthService — detalhe
 
@@ -616,7 +711,7 @@ Origens permitidas: `http://localhost:4200` e `http://localhost:4300`. Métodos:
 
 ---
 
-## 9. Upload de Imagens
+## 9. Upload de Arquivos
 
 `UploadService` (backend) salva arquivos em `${user.home}/lms-uploads/{subpasta}/` com nome gerado por UUID. `UploadConfig` registra `ResourceHandler` para servir arquivos em `/uploads/**`.
 
@@ -629,7 +724,43 @@ A URL armazenada é absoluta (`http://localhost:8080/uploads/...`). Ao fazer nov
 
 ---
 
-## 10. Decisões de Arquitetura
+## 10. Aparência e White-label
+
+Tudo que muda de um cliente para outro vive na tela **Aparência** e é
+persistido no servidor:
+
+| Configuração | Onde | Quem altera |
+|---|---|---|
+| Nome e assinatura | `configuracao_marca` | ADMIN |
+| Logotipos (fundo claro e escuro) | `configuracao_marca` + arquivo | ADMIN |
+| Paleta (14 tokens) e tipografia, por modo | `configuracao_marca.tema` (jsonb) | ADMIN |
+| Modo claro/escuro/sistema | `localStorage` | cada usuário |
+
+O modo é a exceção deliberada: é conforto de leitura, não identidade da empresa.
+
+**Como a paleta chega à tela.** `MarcaService` faz o GET e repassa o tema ao
+`TemaService`, que escreve custom properties `--tema-*` inline no `<html>`. O
+Tailwind consome esses tokens no `@theme`, então a aplicação inteira repinta sem
+rebuild. O `localStorage` mantém um cache de primeira pintura — nunca é a fonte
+da verdade.
+
+**Edição é rascunho.** Cores mudam ao vivo na tela mas só valem para os outros
+usuários após "Publicar". Isso permite experimentar uma paleta inteira sem que
+todo mundo veja cada passo.
+
+### Design system de selos
+
+Combinar dois tokens de marca (`bg-marca-suave` + `text-marca-escura`) produz
+selo ilegível em paletas onde ambos são escuros. A solução é estrutural: use
+`.lms-badge` + variante (`-marca`, `-destaque`, `-sucesso`, `-erro`, `-aviso`,
+`-neutro`). A cor entra só como tinta de fundo (14%) e borda (40%); o texto usa
+`--tema-texto`, cuja legibilidade sobre `--tema-superficie` a tela de Aparência
+valida. Cores fixas do Tailwind (`bg-purple-100`) não acompanham o tema e foram
+removidas.
+
+---
+
+## 11. Decisões de Arquitetura
 
 | Decisão | Justificativa |
 |---|---|
@@ -644,32 +775,81 @@ A URL armazenada é absoluta (`http://localhost:8080/uploads/...`). Ao fazer nov
 | **PK composta com `@EmbeddedId`** | Modelo relacional correto para professor_cursos; sem surrogate key desnecessária |
 | **`@Query` JPQL para `ProfessorCurso`** | Spring Data não deriva queries de `@EmbeddedId`; necessário JPQL explícito com `pc.id.professorId` |
 | **UnidadeController separado de RegiaoController** | Rota `/api/unidades/{slug}` (leitura por slug) é distinta do CRUD `/api/regioes/{id}/unidades` |
+| **Identidade e tema no servidor** | São configuração da instalação, não preferência de navegador: um admin define uma vez e vale para todos, inclusive para o visitante sem sessão |
+| **Modo claro/escuro no `localStorage`** | É conforto de leitura, não identidade; o botão da barra precisa responder sem exigir permissão de admin |
+| **`configuracao_marca` de linha única com `CHECK id = 1`** | Impede um segundo registro disputando o papel de "a marca"; a linha nasce na migration, então nunca existe estado "não configurado" |
+| **Tema como `jsonb` + (de)serialização no service** | O Postgres valida a sintaxe na escrita; manter o mapeamento fora do Hibernate deixa o contrato sob controle do DTO validado |
+| **Edição do admin em páginas dedicadas** | O formulário embutido espremia a capa em 192px e escondia a listagem; a página é endereçável e carrega o registro pelo id |
+| **Selos com contraste estrutural** | Num produto white-label a paleta é dado do cliente; par fixo de tokens quebra em alguma paleta válida |
 
 ---
 
-## 11. Como Rodar Localmente
+## 12. Testes
+
+| Suíte | Comando | Cobertura |
+|---|---|---|
+| Backend | `cd backend && ./mvnw verify` | 94 testes de integração |
+| Frontend (unit) | `cd frontend && npm test` | 73 specs (Vitest) |
+| Frontend (E2E) | `cd frontend && npm run e2e` | 30 cenários (Playwright) |
+
+**Backend** — `IntegrationTestBase` sobe um Postgres 18 real via Testcontainers
+(H2 não serve: o projeto usa recursos específicos do Postgres). O container é
+singleton em bloco estático, compartilhado entre subclasses; cada teste roda em
+transação revertida. Helpers: `criarUsuario`, `tokenPara`, `criarCurso`,
+`criarModulo`, `matricular`, `contarQueries`.
+
+⚠️ A senha mínima em `/api/auth/register` é **8 caracteres** — testes com senhas
+curtas falham na validação.
+
+**Frontend** — Vitest com `criarMock<T>(['metodo'])` de `src/testing/mock.ts`.
+Use `npm test`; `npx vitest run` falha porque a configuração vem do builder do
+Angular. Componente com `routerLink` precisa de `provideRouter([])` no TestBed.
+
+**E2E** — rodam em série (escrevem no banco compartilhado). A fixture `apoio.ts`
+cria e promove um admin de teste dedicado; senha em `E2E_ADMIN_PASSWORD`
+(`frontend/e2e/.env.e2e`). Cobrem navegação pública, login pela interface,
+guards por role, os gráficos do dashboard sob zoneless, o widget de
+acessibilidade e a aparência — inclusive a prova de que a paleta publicada por
+um admin chega a um navegador sem estado local.
+
+⚠️ Teste instável conhecido: `aparencia.spec.ts` → "a prévia mostra o hover com
+a cor configurada" falha esporadicamente na execução em sequência e passa
+isolado. Não é regressão.
+
+---
+
+## 13. Como Rodar Localmente
 
 **Pré-requisitos:** Java 25 (Temurin), Node.js 22+, Docker Desktop
 
 ```powershell
-# 1. Banco de dados
+# 1. Configurar o ambiente
 cd backend
-docker compose up -d
-# Se container já existe: docker start lms-postgres
+copy .env.example .env      # preencha DB_PASSWORD, JWT_SECRET, DEV_ADMIN_PASSWORD
 
-# 2. Backend
-$env:JAVA_HOME = "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.2\jbr"
-cd C:\Users\Miguel\Downloads\lms\backend
-.\mvnw.cmd spring-boot:run        # porta 8080
+# 2. Banco de dados
+docker compose up -d        # PostgreSQL 18 na porta 5433
 
-# 3. Frontend
-cd C:\Users\Miguel\Downloads\lms\frontend
+# 3. Backend
+.\mvnw.cmd spring-boot:run   # porta 8080, profile dev
+
+# 4. Frontend
+cd ..\frontend
 npm install
-npx ng serve                       # porta 4200
-
-# Acesso: http://localhost:4200
-# Admin:  miguel@lms.com / 123456
+npx ng serve                 # porta 4200
 ```
+
+Acesso: **http://localhost:4200** · Swagger: **http://localhost:8080/swagger-ui.html**
+
+O profile `dev` cria um ADMIN no boot (`DevAdminSeeder`) a partir de
+`DEV_ADMIN_EMAIL` / `DEV_ADMIN_PASSWORD` do `.env`. Ele **não** existe sob o
+profile `prod`.
+
+### Primeira configuração de um cliente
+
+1. Entre como ADMIN e vá em **Aparência**.
+2. *Identidade*: nome, assinatura e os dois logotipos (PNG/JPG/WebP até 512 KB).
+3. Ajuste as cores de cada modo e clique em **Publicar cores**.
 
 **Aplicar nova migration sem subir o servidor:**
 ```powershell

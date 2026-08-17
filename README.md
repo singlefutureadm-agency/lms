@@ -1,4 +1,4 @@
-# LMS Lite
+# LMS
 
 ![Java](https://img.shields.io/badge/Java-25%20LTS-ED8B00?logo=openjdk)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?logo=springboot)
@@ -7,7 +7,35 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
 ![Tailwind](https://img.shields.io/badge/Tailwind-4.3-06B6D4?logo=tailwindcss)
 
-> Sistema de gestão de cursos educacionais fullstack — projeto de portfólio
+> Plataforma de gestão de cursos **white-label**: cada cliente configura nome,
+> logotipo, cores e tipografia pela própria interface, sem rebuild e sem tocar
+> em código.
+
+---
+
+## White-label
+
+Tudo que muda de um cliente para outro vive numa única tela — **Aparência** — e
+é persistido no servidor, valendo para todos os usuários da instalação:
+
+| Configuração | Onde é guardada | Quem altera |
+|---|---|---|
+| Nome da empresa e assinatura | Servidor (`configuracao_marca`) | ADMIN |
+| Logotipo (fundo claro e fundo escuro) | Servidor + arquivo em disco | ADMIN |
+| Paleta (14 tokens) e tipografia, por modo | Servidor (`configuracao_marca.tema`) | ADMIN |
+| Modo claro/escuro/sistema | Navegador do usuário | cada usuário |
+
+O modo é a única exceção deliberada: é conforto de leitura, não identidade da
+empresa, então continua sendo escolha de cada pessoa.
+
+O nome e o logotipo alimentam também o título da aba e o favicon. A leitura
+(`GET /api/marca`) é pública porque a tela de login já precisa exibir a marca do
+cliente antes de existir sessão.
+
+**Contraste independente da paleta.** Os selos (`.lms-badge`) usam a cor de
+destaque apenas como tinta de fundo e borda; o texto usa o token de texto, cuja
+legibilidade sobre a superfície é validada na própria tela de Aparência. Assim
+nenhuma combinação escolhida pelo cliente produz um selo ilegível.
 
 ---
 
@@ -15,18 +43,19 @@
 
 - **Autenticação JWT** com controle de roles: ADMIN / PROFESSOR / ALUNO
 - **Catálogo de cursos** organizado por área, categoria e tipo, com filtro por unidade/região
-- **CRUD completo** de cursos, áreas, categorias, tipos, regiões e unidades
-- **64 unidades Senac SP** distribuídas em 4 regiões (seed de dados realista)
+- **CRUD completo** de cursos, áreas, categorias, tipos, regiões e unidades, em
+  páginas dedicadas de edição (capa em 16:9, resumo do registro e link para a
+  página pública)
 - **Matrículas** de alunos em cursos com rastreamento de progresso por aula
 - **Lançamento de notas** com aprovação automática (≥ 6,0)
 - **Controle de presença** por aula, com resumo percentual
 - **Conteúdo de aulas** com suporte a vídeo, PDF, texto e link externo
+- **Vídeo por módulo**: upload de arquivo ou link de YouTube/Vimeo
 - **Vínculo Professor ↔ Curso** gerenciado pelo ADMIN
-- **Upload de imagens** para avatar de usuário, capa de curso e foto de unidade
-- **Dashboard administrativo** com gráficos Chart.js (matrículas/mês, cursos por nível, unidades por região) e animações GSAP
-- **Modo claro e escuro** com página de **Aparência**: cores e tipografia
-  configuráveis separadamente para cada modo, com prévia interativa (mostra
-  hover e foco) e aviso de contraste WCAG
+- **Upload de imagens** para avatar, capa de curso, foto de unidade e logotipo
+- **Notificações in-app** por polling (nota lançada, matrícula confirmada)
+- **Dashboard administrativo** com gráficos Chart.js e animações GSAP
+- **Modo claro e escuro** com prévia interativa e aviso de contraste WCAG
 - **Documentação da API** em OpenAPI/Swagger e health check via Actuator
 - **Widget de acessibilidade** completo (WCAG 2.1 AA/AAA):
   - Controle de tamanho de fonte (5 níveis)
@@ -35,11 +64,9 @@
   - Alto contraste, contraste invertido
   - Escala de cinza e sépia
   - Suporte a daltonismo (protanopia, deuteranopia, tritanopia) via SVG feColorMatrix
-  - Cursor grande
-  - Lupa de navegação com texto real do elemento
-  - Links destacados
+  - Cursor grande, lupa de navegação, links destacados
   - Máscara e guia de leitura
-  - Integração com **VLibras** (tradução para Libras — gov.br), via componente próprio
+  - Integração com **VLibras** (tradução para Libras — gov.br)
 
 ---
 
@@ -55,10 +82,10 @@
 | Backend | Spring Boot | 4.1.0 |
 | Linguagem | Java | 25 LTS |
 | Banco | PostgreSQL | 18 |
-| Migrations | Flyway | 12.4 (V1–V17) |
+| Migrations | Flyway | 12.4 (V1–V24) |
 | Auth | JWT (jjwt) | 0.13.0 |
-| Testes (back) | JUnit 6 + Testcontainers | 52 testes de integração |
-| Testes (front) | Vitest · Playwright | 48 specs · 29 cenários E2E |
+| Testes (back) | JUnit 6 + Testcontainers | 94 testes de integração |
+| Testes (front) | Vitest · Playwright | 73 specs · 30 cenários E2E |
 | Infra | Docker Compose | — |
 
 ---
@@ -76,7 +103,9 @@ Spring Boot 4.1.0 (:8080)
 PostgreSQL 18 (:5433)
 ```
 
-O token JWT contém apenas o `sub=email`. A cada request, o backend carrega o usuário completo do banco, incluindo a role atual — isso permite alterar roles sem revogar tokens.
+O token JWT contém apenas o `sub=email`. A cada request, o backend carrega o
+usuário completo do banco, incluindo a role atual — isso permite alterar roles
+sem revogar tokens.
 
 ---
 
@@ -85,17 +114,16 @@ O token JWT contém apenas o `sub=email`. A cada request, o backend carrega o us
 **Pré-requisitos:** Java 25 (Temurin), Node.js 22+, Docker Desktop
 
 ```bash
-# 1. Clonar
-git clone https://github.com/MiguelFerreira31/lms
-cd lms
-
-# 2. Subir banco (PostgreSQL no Docker)
+# 1. Configurar o ambiente do backend
 cd backend
+cp .env.example .env        # preencha DB_PASSWORD e JWT_SECRET
+
+# 2. Subir o banco (PostgreSQL no Docker)
 docker compose up -d
 
 # 3. Backend (porta 8080)
 # Windows — definir JAVA_HOME se necessário:
-# $env:JAVA_HOME = "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.2\jbr"
+# $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25"
 ./mvnw spring-boot:run
 
 # 4. Frontend (porta 4200)
@@ -109,7 +137,17 @@ Acesse: **http://localhost:4200**
 - Documentação da API (Swagger UI): **http://localhost:8080/swagger-ui.html**
 - Health check: **http://localhost:8080/actuator/health**
 
-Conta admin padrão: `miguel@lms.com` / `123456`
+O profile `dev` cria um usuário ADMIN no boot (`DevAdminSeeder`) a partir de
+`DEV_ADMIN_EMAIL`/`DEV_ADMIN_PASSWORD` no `.env`. Ele **não** existe sob o
+profile `prod`.
+
+### Primeira configuração de um cliente
+
+1. Entre como ADMIN e vá em **Aparência**.
+2. Em *Identidade*, defina nome e assinatura e envie os dois logotipos
+   (PNG/JPG/WebP até 512KB) — o de fundo claro para o site, o de fundo escuro
+   para a barra do sistema.
+3. Ajuste as cores de cada modo e clique em **Publicar cores**.
 
 ---
 
@@ -120,8 +158,8 @@ lms/
 ├── backend/          # Spring Boot 4.1.0 — API REST
 │   └── src/main/java/br/com/lms/
 │       ├── config/       # Security, Upload, Cache, OpenAPI
-│       ├── domain/       # area, conteudo, curso, matricula, presenca,
-│       │                 # professor, regiao, upload, usuario
+│       ├── domain/       # area, conteudo, curso, marca, matricula, notificacao,
+│       │                 # presenca, professor, regiao, upload, usuario
 │       │                 # (cada um com Entity + Controller + Service + Repository)
 │       ├── dto/          # DTOs centralizados (DTOs.java)
 │       ├── exception/    # GlobalExceptionHandler (RFC 7807)
@@ -129,54 +167,59 @@ lms/
 ├── frontend/         # Angular 22 SPA (zoneless)
 │   └── src/app/
 │       ├── accessibility/  # Widget de acessibilidade standalone
-│       ├── core/           # authGuard/adminGuard/professorGuard, interceptors, services
+│       ├── core/           # guards, interceptors, services (marca, tema, auth…)
 │       ├── features/       # admin, areas, cursos, dashboard, home,
 │       │                   # login, matriculas, professor, sobre, unidades
-│       └── shared/         # Navbar, PublicNav, CursoCard, ImageUpload, Vlibras
-│   └── src/tailwind.css    # Tailwind 4: @import, @theme e design system .lms-*
-├── CONTEXTO_PROJETO.md  # Contexto técnico consolidado (inclui o registro da migração)
-├── AUDITORIA.md         # Histórico de auditorias e bugs corrigidos
-└── DOCUMENTACAO.md      # Referência técnica completa
+│       └── shared/         # Navbar, PublicNav, LogoMarca, CursoCard,
+│                           # ImageUpload, VideoUpload, VideoEmbed, Vlibras
+│   └── src/tailwind.css    # Tailwind 4: @theme e design system .lms-*
+├── CLAUDE.md            # Contexto operacional: convenções, decisões e armadilhas
+└── DOCUMENTACAO.md      # Referência técnica: o que existe e onde
 ```
+
+**`CLAUDE.md`** é lido automaticamente por agentes de IA (Claude Code) no início
+de cada sessão. Quem for trabalhar no código — pessoa ou agente — deve começar
+por ele: concentra as decisões que precisam ser respeitadas e as armadilhas já
+descobertas.
 
 ---
 
 ## Banco de dados
 
-17 migrations Flyway (V1–V17) gerenciam o schema. Highlights:
-- **V12**: seed com 4 regiões, 64 unidades reais do Senac SP e 35 cursos
-- **V13/V14**: slugs únicos para unidades (com correção de transliteração)
+24 migrations Flyway (V1–V24) gerenciam o schema. Highlights:
+
+- **V12**: seed de exemplo com 4 regiões, 64 unidades e 35 cursos
+- **V13/V14**: slugs únicos para unidades
 - **V15**: campos de imagem em usuários, cursos e unidades
-- **V16**: vínculo curso ↔ área
-- **V17**: 15 índices de chave estrangeira (o Postgres não indexa FK automaticamente) + índice parcial `cursos(criado_em DESC) WHERE ativo = true`
+- **V17**: 15 índices de chave estrangeira (o Postgres não indexa FK automaticamente)
+- **V18**: busca textual em cursos
+- **V19**: notificações in-app
+- **V20/V21**: vídeo por módulo (arquivo ou link externo)
+- **V22**: `configuracao_marca` — identidade da instalação (linha única)
+- **V23**: coluna `tema` (jsonb) — paleta e tipografia da instalação
+- **V24**: remove a marca do cliente original dos dados de exemplo
 
 ---
 
 ## Testes
 
 ```bash
-# Backend — 52 testes de integração contra Postgres real (Testcontainers)
+# Backend — testes de integração contra Postgres real (Testcontainers)
 cd backend && ./mvnw verify
 
-# Frontend — 48 testes unitários (Vitest, jsdom)
+# Frontend — testes unitários (Vitest, jsdom)
 cd frontend && npm test
 
-# Frontend — 29 cenários end-to-end (Playwright)
+# Frontend — cenários end-to-end (Playwright)
 # exige o backend em :8080; o servidor do Angular sobe sozinho
 cd frontend && npm run e2e
 ```
 
 Os E2E cobrem navegação pública, login pela interface, guards por role, o
-dashboard admin (os 3 gráficos Chart.js montando sob zoneless) e o widget de
-acessibilidade. Os cenários de permissão criam usuários de verdade via API —
-forjar a role no `localStorage` não funciona, porque o `AuthService` revalida
-em `/api/usuarios/me` e o backend é a fonte da verdade.
+dashboard admin (os 3 gráficos Chart.js montando sob zoneless), o widget de
+acessibilidade e a configuração de aparência — inclusive a prova de que a
+paleta publicada por um admin chega a um navegador sem nenhum estado local.
 
----
-
-## Autor
-
-**Miguel Ferreira** — Desenvolvedor Full Stack
-
-[![GitHub](https://img.shields.io/badge/GitHub-MiguelFerreira31-181717?logo=github)](https://github.com/MiguelFerreira31)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-miguelcezarferreira-0A66C2?logo=linkedin)](https://linkedin.com/in/miguelcezarferreira)
+Os cenários de permissão criam usuários de verdade via API — forjar a role no
+`localStorage` não funciona, porque o `AuthService` revalida em
+`/api/usuarios/me` e o backend é a fonte da verdade.
