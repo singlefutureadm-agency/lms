@@ -71,6 +71,9 @@ class MarcaControllerIT extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nome").value("Acme Educação"));
 
+        entityManager.flush();
+        entityManager.clear();
+
         // sem o @CacheEvict, isto ainda devolveria "LMS"
         mockMvc.perform(get("/api/marca"))
                 .andExpect(status().isOk())
@@ -147,6 +150,125 @@ class MarcaControllerIT extends IntegrationTestBase {
         mockMvc.perform(delete("/api/marca/logo/INVERSO").header("Authorization", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.logoInversoUrl").doesNotExist());
+    }
+
+    /** Payload mínimo e válido de tema, com as duas paletas completas. */
+    private Map<String, Object> temaValido(String corMarca) {
+        var cores = mapa(
+            "marca", corMarca, "marcaEscura", "#1d4ed8", "marcaProfunda", "#1e3a8a",
+            "marcaSuave", "#eff6ff", "destaque", "#f97316", "fundo", "#f8fafc",
+            "superficie", "#ffffff", "superficie2", "#f1f5f9", "texto", "#0f172a",
+            "textoSuave", "#64748b", "borda", "#e5e7eb", "sucesso", "#16a34a",
+            "erro", "#e11d48", "aviso", "#f59e0b");
+        var tipografia = mapa("fonteTitulo", "Roboto", "fonteCorpo", "Roboto",
+                "escala", 1.0, "pesoTitulo", 700);
+        var modo = mapa("cores", cores, "tipografia", tipografia);
+        return mapa("claro", modo, "escuro", modo);
+    }
+
+    @Test
+    @DisplayName("Tema nasce nulo (padrao de fabrica) e passa a ser devolvido depois de publicado")
+    void tema_padraoEDepoisPublicado() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin.tema@lms.com", "senha12345", Usuario.Role.ADMIN);
+        String token = "Bearer " + tokenPara(admin);
+
+        mockMvc.perform(get("/api/marca"))
+                .andExpect(jsonPath("$.tema").doesNotExist());
+
+        mockMvc.perform(put("/api/marca/tema").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(temaValido("#0a7d3f"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tema.claro.cores.marca").value("#0a7d3f"));
+
+        // Força o INSERT/UPDATE a chegar ao banco e esvazia o contexto de
+        // persistência. Sem isto o teste passava sem nunca escrever a coluna: a
+        // transação é revertida no fim, o flush nunca acontecia e a leitura
+        // seguinte vinha do cache de primeiro nível. Foi assim que um erro real
+        // de mapeamento (String -> jsonb) escapou da suíte.
+        entityManager.flush();
+        entityManager.clear();
+
+        // publico, e com o cache invalidado
+        mockMvc.perform(get("/api/marca"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tema.claro.cores.marca").value("#0a7d3f"))
+                .andExpect(jsonPath("$.tema.escuro.tipografia.pesoTitulo").value(700));
+    }
+
+    @Test
+    @DisplayName("DELETE do tema devolve a instalacao ao padrao de fabrica")
+    void tema_restauraDeFabrica() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin.tema2@lms.com", "senha12345", Usuario.Role.ADMIN);
+        String token = "Bearer " + tokenPara(admin);
+
+        mockMvc.perform(put("/api/marca/tema").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(temaValido("#0a7d3f"))))
+                .andExpect(status().isOk());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(delete("/api/marca/tema").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tema").doesNotExist());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/marca"))
+                .andExpect(jsonPath("$.tema").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Cor fora do formato hexadecimal e recusada: o valor vai parar em CSS no cliente")
+    void tema_corInvalidaEhRecusada() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin.tema3@lms.com", "senha12345", Usuario.Role.ADMIN);
+        String token = "Bearer " + tokenPara(admin);
+
+        // tentativa de injetar declaracao CSS extra pelo valor do token
+        mockMvc.perform(put("/api/marca/tema").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(temaValido("red; background: url(http://x)"))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/marca"))
+                .andExpect(jsonPath("$.tema").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Paleta incompleta e recusada: um token ausente deixaria parte da tela sem cor")
+    void tema_paletaIncompletaEhRecusada() throws Exception {
+        Usuario admin = criarUsuario("Admin", "admin.tema4@lms.com", "senha12345", Usuario.Role.ADMIN);
+        String token = "Bearer " + tokenPara(admin);
+
+        var incompleto = temaValido("#0a7d3f");
+        @SuppressWarnings("unchecked")
+        var claro = (Map<String, Object>) incompleto.get("claro");
+        @SuppressWarnings("unchecked")
+        var cores = (Map<String, Object>) claro.get("cores");
+        cores.remove("borda");
+
+        mockMvc.perform(put("/api/marca/tema").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(incompleto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("ALUNO nao publica a paleta da instalacao")
+    void tema_alunoNaoEscreve() throws Exception {
+        Usuario aluno = criarUsuario("Aluno", "aluno.tema@lms.com", "senha12345", Usuario.Role.ALUNO);
+        String token = "Bearer " + tokenPara(aluno);
+
+        mockMvc.perform(put("/api/marca/tema").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(temaValido("#0a7d3f"))))
+                .andExpect(status().is4xxClientError());
+
+        mockMvc.perform(delete("/api/marca/tema").header("Authorization", token))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test

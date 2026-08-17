@@ -2,6 +2,7 @@ package br.com.lms.domain.marca;
 
 import br.com.lms.dto.DTOs.MarcaRequest;
 import br.com.lms.dto.DTOs.MarcaResponse;
+import br.com.lms.dto.DTOs.TemaDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -58,5 +59,24 @@ public class MarcaController {
     @Operation(summary = "Remove o logotipo, voltando ao ícone genérico com o nome ao lado")
     public ResponseEntity<MarcaResponse> removerLogo(@PathVariable MarcaService.Variante variante) {
         return ResponseEntity.ok(marcaService.removerLogo(variante));
+    }
+
+    /**
+     * O tema tem endpoint próprio, e não um campo do PUT de identidade: são
+     * duas edições independentes na tela de Aparência, e juntá-las obrigaria a
+     * reenviar a paleta inteira só para corrigir o nome da empresa.
+     */
+    @PutMapping("/tema")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Define paleta e tipografia dos modos claro e escuro")
+    public ResponseEntity<MarcaResponse> atualizarTema(@Valid @RequestBody TemaDTO tema) {
+        return ResponseEntity.ok(marcaService.atualizarTema(tema));
+    }
+
+    @DeleteMapping("/tema")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Restaura o tema para o padrão de fábrica do produto")
+    public ResponseEntity<MarcaResponse> restaurarTema() {
+        return ResponseEntity.ok(marcaService.restaurarTema());
     }
 }

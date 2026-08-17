@@ -112,6 +112,7 @@ export class AparenciaComponent {
   readonly erroLogo = signal<string | null>(null);
   readonly salvandoMarca = signal(false);
   readonly enviandoLogo = signal<VarianteLogo | null>(null);
+  readonly salvandoTema = signal(false);
 
   /** Identidade é configuração da instalação — só ADMIN escreve (o backend também barra). */
   readonly podeEditarMarca = computed(() => this.auth.isAdmin());
@@ -287,14 +288,56 @@ export class AparenciaComponent {
     this.tema.definirTipografia(this.editando(), { pesoTitulo });
   }
 
+  /**
+   * Restaurar mexe só no rascunho local — o que está no ar para os outros
+   * usuários continua igual até "Publicar". É o mesmo contrato de qualquer
+   * outra edição de cor nesta tela.
+   */
   restaurarModo(): void {
     this.tema.restaurarModo(this.editando());
-    this.snack.open(`Modo ${this.editando()} restaurado`, 'OK', { duration: 2500 });
+    this.snack.open(`Modo ${this.editando()} voltou ao padrão — publique para valer para todos`,
+      'OK', { duration: 4000 });
   }
 
   restaurarTudo(): void {
     this.tema.restaurarTudo();
-    this.snack.open('Aparência restaurada para o padrão', 'OK', { duration: 2500 });
+    this.snack.open('Cores e tipografia voltaram ao padrão — publique para valer para todos',
+      'OK', { duration: 4000 });
+  }
+
+  descartarTema(): void {
+    this.tema.descartarRascunho();
+  }
+
+  /** Publica a paleta para toda a instalação. */
+  publicarTema(): void {
+    this.salvandoTema.set(true);
+    this.marca.salvarTema(this.tema.temaDaInstalacao()).subscribe({
+      next: () => {
+        this.salvandoTema.set(false);
+        this.snack.open('Cores e tipografia publicadas para toda a instalação', 'OK', { duration: 3000 });
+      },
+      error: (e) => {
+        this.salvandoTema.set(false);
+        this.snack.open(mensagemDeErro(e, 'Erro ao publicar a aparência'), 'Fechar', { duration: 4000 });
+      },
+    });
+  }
+
+  /** Apaga a customização no servidor: a instalação volta ao padrão do produto. */
+  restaurarTemaDeFabrica(): void {
+    if (!confirm('Restaurar as cores de fábrica para TODOS os usuários da instalação?')) return;
+    this.salvandoTema.set(true);
+    this.marca.restaurarTema().subscribe({
+      next: () => {
+        this.salvandoTema.set(false);
+        this.snack.open('Instalação de volta ao padrão de fábrica', 'OK', { duration: 3000 });
+      },
+      error: (e) => {
+        this.salvandoTema.set(false);
+        this.snack.open(mensagemDeErro(e, 'Erro ao restaurar'), 'Fechar', { duration: 4000 });
+      },
+    });
   }
 
   /**

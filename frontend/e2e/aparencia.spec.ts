@@ -72,10 +72,42 @@ test.describe('aparência e temas', () => {
         getComputedStyle(document.documentElement).getPropertyValue('--tema-marca').trim()))
       .toBe('#0a7d3f');
 
-    // e a escolha foi persistida
-    const salvo = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('lms_tema')!).claro.cores.marca);
-    expect(salvo).toBe('#0a7d3f');
+    // enquanto não publicada, a mudança é rascunho: o botão de publicar fica
+    // habilitado e o aviso aparece
+    await expect(page.getByRole('button', { name: /Publicar cores/ })).toBeEnabled();
+    await expect(page.getByText('Rascunho não publicado.')).toBeVisible();
+  });
+
+  test('publicar as cores grava no servidor e vale para uma sessão nova', async ({ page }) => {
+    await page.goto('/aparencia');
+    await page.getByRole('button', { name: 'Claro', exact: true }).first().click();
+
+    await page.locator('input[type="color"]').first().evaluate((el: HTMLInputElement) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(el, '#0a7d3f');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.getByRole('button', { name: /Publicar cores/ }).click();
+    await expect(page.getByText('Rascunho não publicado.')).toBeHidden();
+
+    // O ponto do recurso: a paleta é da INSTALAÇÃO. Um navegador sem nenhum
+    // estado local — e sem sessão — tem de receber a mesma cor.
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/login');
+    await expect
+      .poll(() => page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--tema-marca').trim()))
+      .toBe('#0a7d3f');
+
+    // devolve a instalação ao padrão para não vazar estado entre cenários
+    await entrarComo(page, sessao);
+    await page.goto('/aparencia');
+    page.once('dialog', d => d.accept());
+    await page.getByRole('button', { name: /Restaurar de fábrica na instalação/ }).click();
+    await expect
+      .poll(() => page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--tema-marca').trim()))
+      .toBe('#2563eb');
   });
 
   test('o modo escuro chega às telas do sistema, não só à página de Aparência', async ({ page }) => {
@@ -94,19 +126,23 @@ test.describe('aparência e temas', () => {
     expect(luminancia).toBeLessThan(0.3);
   });
 
-  test('restaurar tudo volta ao padrão', async ({ page }) => {
+  test('voltar ao padrão nos dois modos repinta o rascunho', async ({ page }) => {
     await page.goto('/aparencia');
+    await page.getByRole('button', { name: 'Claro', exact: true }).first().click();
     await page.locator('input[type="color"]').first().evaluate((el: HTMLInputElement) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
       setter.call(el, '#ff00ff');
       el.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
-    await page.getByRole('button', { name: /Restaurar tudo/ }).click();
+    await page.getByRole('button', { name: /Padrão nos dois modos/ }).click();
 
-    const marca = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('lms_tema')!).claro.cores.marca);
-    expect(marca.toLowerCase()).toBe('#2563eb');
+    // Restaurar mexe só no rascunho local — nada foi publicado, então basta a
+    // custom property voltar ao padrão de fábrica.
+    await expect
+      .poll(() => page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--tema-marca').trim()))
+      .toBe('#2563eb');
   });
 
   test('a prévia mostra o hover com a cor configurada', async ({ page }) => {
@@ -114,11 +150,20 @@ test.describe('aparência e temas', () => {
     await page.getByRole('button', { name: 'Claro', exact: true }).first().click();
 
     const botao = page.locator('.pv-btn-marca');
+
+    // A prévia fica abaixo da dobra desde que a seção de Identidade entrou na
+    // página, então `hover()` precisa rolar até ela. Sem trazer o elemento para
+    // a viewport ANTES de medir o repouso — e sem tirar o ponteiro de onde o
+    // clique anterior o deixou — as duas leituras podiam sair do mesmo estado
+    // e o teste falhava de forma intermitente.
+    await botao.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
     const repouso = await botao.evaluate(el => getComputedStyle(el).backgroundColor);
 
     await botao.hover();
-    const comHover = await botao.evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(comHover).not.toBe(repouso);
+    await expect
+      .poll(() => botao.evaluate(el => getComputedStyle(el).backgroundColor))
+      .not.toBe(repouso);
 
     // e o hover segue a cor que o usuário definir para "marca escura"
     await page.locator('input[type="color"]').nth(1).evaluate((el: HTMLInputElement) => {
@@ -150,8 +195,11 @@ test.describe('aparência e temas', () => {
 
     await expect(page.getByRole('button', { name: /Exportar/ })).toHaveCount(0);
     await expect(page.getByText(/Importar tema/)).toHaveCount(0);
-    // as ações que continuam
-    await expect(page.getByRole('button', { name: /Restaurar tudo/ })).toBeVisible();
+    // as ações que continuam (renomeadas quando a paleta virou config da
+    // instalação: "restaurar" agora mexe no rascunho, "publicar" é que vale
+    // para todos)
+    await expect(page.getByRole('button', { name: /Padrão nos dois modos/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Publicar cores/ })).toBeVisible();
   });
 
   test('os gráficos do dashboard acompanham a troca de tema', async ({ page }) => {

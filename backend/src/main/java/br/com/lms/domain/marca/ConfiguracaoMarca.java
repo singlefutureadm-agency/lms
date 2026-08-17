@@ -2,6 +2,8 @@ package br.com.lms.domain.marca;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -42,6 +44,25 @@ public class ConfiguracaoMarca {
     /** Logotipo para fundos escuros / cor da marca (barra do sistema, login). */
     @Column(name = "logo_inverso_url", length = 500)
     private String logoInversoUrl;
+
+    /**
+     * Paleta e tipografia dos dois modos, serializadas como JSON (coluna
+     * {@code jsonb}). Fica como String e não como objeto mapeado: a
+     * (de)serialização é feita no service com o ObjectMapper da aplicação, o que
+     * mantém o contrato sob controle do DTO validado em vez de depender da
+     * integração JSON do Hibernate.
+     *
+     * <p>{@code null} significa "nunca customizado" — o frontend aplica o padrão
+     * de fábrica do produto.
+     *
+     * <p>{@code @JdbcTypeCode(SqlTypes.JSON)} é obrigatório: sem ele o Hibernate
+     * envia a String como {@code varchar} e o Postgres recusa a atribuição a uma
+     * coluna {@code jsonb} ("column is of type jsonb but expression is of type
+     * character varying"). Não é detalhe cosmético — quebra toda escrita.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "tema", columnDefinition = "jsonb")
+    private String tema;
 
     @Column(name = "atualizado_em", nullable = false)
     private LocalDateTime atualizadoEm;

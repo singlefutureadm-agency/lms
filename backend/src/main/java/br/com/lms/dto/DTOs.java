@@ -20,8 +20,11 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -341,10 +344,12 @@ public class DTOs {
 
     // ---- Marca (white-label) ----
 
-    @Schema(description = "Identidade visual da instalação (GET /api/marca — público)")
-    public record MarcaResponse(String nome, String assinatura, String logoUrl, String logoInversoUrl) {
-        public static MarcaResponse from(ConfiguracaoMarca m) {
-            return new MarcaResponse(m.getNome(), m.getAssinatura(), m.getLogoUrl(), m.getLogoInversoUrl());
+    @Schema(description = "Aparência da instalação (GET /api/marca — público). "
+            + "tema nulo = padrão de fábrica do produto")
+    public record MarcaResponse(String nome, String assinatura, String logoUrl, String logoInversoUrl,
+                                TemaDTO tema) {
+        public static MarcaResponse from(ConfiguracaoMarca m, TemaDTO tema) {
+            return new MarcaResponse(m.getNome(), m.getAssinatura(), m.getLogoUrl(), m.getLogoInversoUrl(), tema);
         }
     }
 
@@ -354,4 +359,47 @@ public class DTOs {
         @NotBlank @Size(max = 60) String nome,
         @Size(max = 90) String assinatura
     ) {}
+
+    // ---- Tema (paleta e tipografia da instalação) ----
+
+    /**
+     * Formato de cor aceito. A validação não é cosmética: estes valores são
+     * escritos pelo frontend em custom properties CSS (`style.setProperty`), e
+     * uma string livre permitiria injetar declarações extras. Restringir a
+     * #rrggbb fecha isso na entrada.
+     */
+    private static final String HEX = "^#[0-9A-Fa-f]{6}$";
+
+    @Schema(description = "Paleta de um modo. Todos os tokens são obrigatórios: "
+            + "um token ausente deixaria parte da interface sem cor definida")
+    public record PaletaDTO(
+        @NotBlank @Pattern(regexp = HEX) String marca,
+        @NotBlank @Pattern(regexp = HEX) String marcaEscura,
+        @NotBlank @Pattern(regexp = HEX) String marcaProfunda,
+        @NotBlank @Pattern(regexp = HEX) String marcaSuave,
+        @NotBlank @Pattern(regexp = HEX) String destaque,
+        @NotBlank @Pattern(regexp = HEX) String fundo,
+        @NotBlank @Pattern(regexp = HEX) String superficie,
+        @NotBlank @Pattern(regexp = HEX) String superficie2,
+        @NotBlank @Pattern(regexp = HEX) String texto,
+        @NotBlank @Pattern(regexp = HEX) String textoSuave,
+        @NotBlank @Pattern(regexp = HEX) String borda,
+        @NotBlank @Pattern(regexp = HEX) String sucesso,
+        @NotBlank @Pattern(regexp = HEX) String erro,
+        @NotBlank @Pattern(regexp = HEX) String aviso
+    ) {}
+
+    @Schema(description = "Tipografia de um modo")
+    public record TipografiaDTO(
+        @NotBlank @Size(max = 200) String fonteTitulo,
+        @NotBlank @Size(max = 200) String fonteCorpo,
+        @NotNull @DecimalMin("0.75") @DecimalMax("1.5") Double escala,
+        @NotNull @Min(100) @Max(900) Integer pesoTitulo
+    ) {}
+
+    public record TemaModoDTO(@NotNull @Valid PaletaDTO cores, @NotNull @Valid TipografiaDTO tipografia) {}
+
+    @Schema(description = "Paleta e tipografia dos dois modos (PUT /api/marca/tema — ADMIN). "
+            + "O modo ativo não entra: é preferência de cada usuário, guardada no navegador")
+    public record TemaDTO(@NotNull @Valid TemaModoDTO claro, @NotNull @Valid TemaModoDTO escuro) {}
 }

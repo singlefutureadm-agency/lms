@@ -120,18 +120,82 @@ export const COR_FALLBACK = '#888888';
 
 const CHAVE = 'lms_tema';
 
+/** Paleta e tipografia dos dois modos — o que vem do servidor. */
+export interface TemaDaInstalacao {
+  claro: TemaDoModo;
+  escuro: TemaDoModo;
+}
+
 /**
  * Estado da aparência da aplicação.
  *
  * Aplica escrevendo custom properties inline no `<html>`. Isso vence as regras
  * de `tema.css` por especificidade, e o Tailwind (que consome esses tokens no
  * `@theme`) repinta tudo sem rebuild.
+ *
+ * ## O que é da instalação e o que é do usuário
+ * **Paleta e tipografia** são identidade visual do cliente: definidas por um
+ * administrador, guardadas no servidor e iguais para todo mundo — na mesma
+ * linha do nome e do logotipo (ver {@link MarcaService}, que faz o GET e
+ * repassa o tema para cá).
+ *
+ * **O modo (claro/escuro/sistema)** continua sendo de cada usuário, no
+ * `localStorage`: é escolha de conforto de leitura, não de marca, e o botão de
+ * alternância na barra superior precisa responder sem exigir permissão de
+ * administrador.
+ *
+ * O `localStorage` também guarda a última paleta conhecida, como cache de
+ * primeira pintura — sem ele a aplicação abriria com as cores de fábrica até o
+ * GET responder.
  */
 @Injectable({ providedIn: 'root' })
 export class TemaService {
   private readonly doc = inject(DOCUMENT);
 
   readonly config = signal<ConfiguracaoTema>(this.carregar());
+
+  /** Falso enquanto a paleta em tela vier do cache, e não do servidor. */
+  readonly sincronizado = signal(false);
+
+  /**
+   * Último tema confirmado pelo servidor, serializado. Serve de referência para
+   * saber se o que está na tela é um rascunho ainda não publicado — a edição de
+   * cores é ao vivo (é o valor da prévia), então só a comparação com o
+   * publicado distingue "experimentando" de "no ar para todos".
+   */
+  private readonly publicado = signal('');
+
+  readonly temaAlterado = computed(() =>
+    JSON.stringify(this.temaDaInstalacao()) !== this.publicado());
+
+  /**
+   * Substitui a paleta e a tipografia pelo que veio do servidor, preservando o
+   * modo escolhido pelo usuário. `null` = instalação nunca customizada: aplica
+   * o padrão de fábrica do produto.
+   */
+  aplicarDaInstalacao(tema: TemaDaInstalacao | null): void {
+    const origem = tema ?? TEMA_PADRAO;
+    this.config.update(c => ({
+      modo: c.modo,
+      claro: mesclarModo(TEMA_PADRAO.claro, origem.claro),
+      escuro: mesclarModo(TEMA_PADRAO.escuro, origem.escuro),
+    }));
+    this.publicado.set(JSON.stringify(this.temaDaInstalacao()));
+    this.sincronizado.set(true);
+  }
+
+  /** Snapshot do que seria enviado ao servidor — sem o modo, que é local. */
+  temaDaInstalacao(): TemaDaInstalacao {
+    const c = this.config();
+    return { claro: c.claro, escuro: c.escuro };
+  }
+
+  /** Descarta o rascunho local e volta ao que está publicado no servidor. */
+  descartarRascunho(): void {
+    if (!this.publicado()) return;
+    const tema = JSON.parse(this.publicado()) as TemaDaInstalacao;
+    this.config.update(c => ({ modo: c.modo, claro: tema.claro, escuro: tema.escuro }));
+  }
 
   /** Modo efetivo: resolve 'sistema' pela preferência do SO. */
   readonly modoEfetivo = computed<'claro' | 'escuro'>(() => {

@@ -3,6 +3,7 @@ import { DOCUMENT } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { TemaService, type TemaDaInstalacao } from './tema.service';
 
 /**
  * Identidade visual do cliente: nome, assinatura e logotipos.
@@ -39,6 +40,8 @@ interface MarcaResponseApi {
   assinatura: string | null;
   logoUrl: string | null;
   logoInversoUrl: string | null;
+  /** `null` = instalação nunca customizada; vale o padrão de fábrica. */
+  tema: TemaDaInstalacao | null;
 }
 
 export type VarianteLogo = 'PRINCIPAL' | 'INVERSO';
@@ -71,6 +74,13 @@ const CHAVE_CACHE = 'lms_marca';
 export class MarcaService {
   private readonly doc = inject(DOCUMENT);
   private readonly http = inject(HttpClient);
+  /**
+   * A paleta chega no mesmo GET da identidade — são a mesma configuração de
+   * aparência da instalação, e separá-las em duas chamadas só adicionaria uma
+   * ida ao servidor no caminho crítico de abertura. Este serviço é quem busca;
+   * o TemaService é quem aplica.
+   */
+  private readonly tema = inject(TemaService);
 
   readonly marca = signal<Marca>(this.lerCache());
   /** Falso até a primeira resposta do servidor — o que está em tela é o cache. */
@@ -102,6 +112,7 @@ export class MarcaService {
     this.http.get<MarcaResponseApi>(`${environment.apiUrl}/marca`).subscribe({
       next: resposta => {
         this.marca.set(this.daApi(resposta));
+        this.tema.aplicarDaInstalacao(resposta.tema);
         this.sincronizada.set(true);
       },
       // Sem rede, o cache local segue valendo para esta sessão — a aplicação
@@ -126,6 +137,18 @@ export class MarcaService {
   removerLogo(variante: VarianteLogo): Observable<MarcaResponseApi> {
     return this.http.delete<MarcaResponseApi>(`${environment.apiUrl}/marca/logo/${variante}`)
       .pipe(tap(resposta => this.marca.set(this.daApi(resposta))));
+  }
+
+  /** Publica a paleta e a tipografia atuais para toda a instalação. Exige ADMIN. */
+  salvarTema(tema: TemaDaInstalacao): Observable<MarcaResponseApi> {
+    return this.http.put<MarcaResponseApi>(`${environment.apiUrl}/marca/tema`, tema)
+      .pipe(tap(resposta => this.tema.aplicarDaInstalacao(resposta.tema)));
+  }
+
+  /** Devolve a instalação ao padrão de fábrica do produto. Exige ADMIN. */
+  restaurarTema(): Observable<MarcaResponseApi> {
+    return this.http.delete<MarcaResponseApi>(`${environment.apiUrl}/marca/tema`)
+      .pipe(tap(resposta => this.tema.aplicarDaInstalacao(resposta.tema)));
   }
 
   /** Valida antes de enviar, para o administrador errar barato. */

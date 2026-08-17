@@ -4,6 +4,7 @@ import br.com.lms.config.CacheConfig;
 import br.com.lms.domain.upload.UploadService;
 import br.com.lms.dto.DTOs.MarcaRequest;
 import br.com.lms.dto.DTOs.MarcaResponse;
+import br.com.lms.dto.DTOs.TemaDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -11,6 +12,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
@@ -29,6 +31,7 @@ public class MarcaService {
 
     private final ConfiguracaoMarcaRepository repository;
     private final UploadService uploadService;
+    private final ObjectMapper objectMapper;
 
     /** Qual dos dois logotipos a operação afeta. */
     public enum Variante { PRINCIPAL, INVERSO }
@@ -36,7 +39,44 @@ public class MarcaService {
     @Transactional(readOnly = true)
     @Cacheable(CacheConfig.MARCA)
     public MarcaResponse buscar() {
-        return MarcaResponse.from(carregar());
+        ConfiguracaoMarca marca = carregar();
+        return MarcaResponse.from(marca, lerTema(marca));
+    }
+
+    @Transactional
+    @CacheEvict(value = CacheConfig.MARCA, allEntries = true)
+    public MarcaResponse atualizarTema(TemaDTO tema) {
+        ConfiguracaoMarca marca = carregar();
+        marca.setTema(objectMapper.writeValueAsString(tema));
+        repository.save(marca);
+        log.info("Tema da instalação atualizado");
+        return MarcaResponse.from(marca, tema);
+    }
+
+    /** Volta ao padrão de fábrica gravando null — ver a coluna em V23. */
+    @Transactional
+    @CacheEvict(value = CacheConfig.MARCA, allEntries = true)
+    public MarcaResponse restaurarTema() {
+        ConfiguracaoMarca marca = carregar();
+        marca.setTema(null);
+        repository.save(marca);
+        log.info("Tema da instalação restaurado para o padrão de fábrica");
+        return MarcaResponse.from(marca, null);
+    }
+
+    /**
+     * Um JSON ilegível na coluna não pode derrubar a aplicação inteira: a
+     * aparência é lida em toda abertura, inclusive na tela pública. Diante de
+     * conteúdo corrompido, cai no padrão de fábrica e registra o problema.
+     */
+    private TemaDTO lerTema(ConfiguracaoMarca marca) {
+        if (marca.getTema() == null || marca.getTema().isBlank()) return null;
+        try {
+            return objectMapper.readValue(marca.getTema(), TemaDTO.class);
+        } catch (RuntimeException e) {
+            log.error("Tema da instalação ilegível — aplicando o padrão de fábrica", e);
+            return null;
+        }
     }
 
     @Transactional
@@ -51,7 +91,7 @@ public class MarcaService {
         marca.setAssinatura(assinatura == null || assinatura.isEmpty() ? null : assinatura);
         repository.save(marca);
         log.info("Identidade da instalação atualizada: nome={}", marca.getNome());
-        return MarcaResponse.from(marca);
+        return MarcaResponse.from(marca, lerTema(marca));
     }
 
     /**
@@ -71,7 +111,7 @@ public class MarcaService {
 
         uploadService.deletar(anterior);
         log.info("Logotipo da instalação atualizado: variante={}", variante);
-        return MarcaResponse.from(marca);
+        return MarcaResponse.from(marca, lerTema(marca));
     }
 
     @Transactional
@@ -84,7 +124,7 @@ public class MarcaService {
 
         uploadService.deletar(anterior);
         log.info("Logotipo da instalação removido: variante={}", variante);
-        return MarcaResponse.from(marca);
+        return MarcaResponse.from(marca, lerTema(marca));
     }
 
     /**
