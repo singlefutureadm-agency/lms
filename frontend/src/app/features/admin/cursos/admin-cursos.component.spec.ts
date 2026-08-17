@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { PageEvent } from '@angular/material/paginator';
 import { of } from 'rxjs';
@@ -40,6 +41,9 @@ describe('AdminCursosComponent', () => {
     TestBed.configureTestingModule({
       imports: [AdminCursosComponent],
       providers: [
+        // "Novo Curso"/"Editar" viraram routerLink para as páginas dedicadas —
+        // sem um Router configurado a diretiva não resolve ActivatedRoute.
+        provideRouter([]),
         { provide: CursoService, useValue: cursoServiceSpy },
         { provide: UploadService, useValue: uploadServiceSpy },
         { provide: MatSnackBar, useValue: snackSpy }

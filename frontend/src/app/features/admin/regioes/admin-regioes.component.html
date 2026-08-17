@@ -7,35 +7,12 @@
         <h1 class="text-2xl font-bold text-texto">Regiões e Unidades</h1>
         <p class="text-texto-suave text-sm mt-1">{{ regioes().length }} região(ões) cadastrada(s)</p>
       </div>
-      <button (click)="abrirFormRegiao()"
-        class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors shadow-xs border-0 cursor-pointer">
+      <a routerLink="/admin/regioes/nova"
+        class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors shadow-xs border-0 cursor-pointer no-underline">
         <mat-icon>add_location_alt</mat-icon>
         Nova Região
-      </button>
+      </a>
     </div>
-
-    <!-- Form Região -->
-    @if (mostrarFormRegiao()) {
-      <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6 mb-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold text-texto">{{ editandoRegiao() ? 'Editar Região' : 'Nova Região' }}</h2>
-          <button (click)="fecharFormRegiao()" class="text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer p-1 rounded-lg hover:bg-superficie-2">
-            <mat-icon>close</mat-icon>
-          </button>
-        </div>
-        <form [formGroup]="formRegiao" (ngSubmit)="salvarRegiao()" class="flex gap-4 items-end">
-          <div class="flex-1 lms-field">
-            <label class="lms-label">Nome da Região <span class="required">*</span></label>
-            <input type="text" class="lms-input" formControlName="nome" placeholder="Ex: Região Centro" />
-          </div>
-          <button type="submit" [disabled]="salvando() || formRegiao.invalid"
-            class="flex items-center gap-2 bg-marca text-white px-5 py-3 rounded-xl font-medium hover:bg-marca-escura transition-colors disabled:opacity-50 border-0 cursor-pointer mt-1">
-            <mat-icon class="text-sm">save</mat-icon>
-            {{ salvando() ? 'Salvando...' : 'Salvar' }}
-          </button>
-        </form>
-      </div>
-    }
 
     <!-- Loading -->
     @if (loading()) {
@@ -69,11 +46,12 @@
                   </div>
                 </mat-panel-title>
                 <mat-panel-description class="justify-end items-center gap-2">
-                  <button (click)="$event.stopPropagation(); abrirFormRegiao(regiao)"
+                  <a [routerLink]="['/admin/regioes', regiao.id, 'editar']"
+                    (click)="$event.stopPropagation()"
                     matTooltip="Editar região"
-                    class="p-1.5 rounded-lg text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer">
+                    class="p-1.5 rounded-lg text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer no-underline flex items-center justify-center">
                     <mat-icon class="text-base">edit</mat-icon>
-                  </button>
+                  </a>
                   <button (click)="$event.stopPropagation(); deletarRegiao(regiao)"
                     matTooltip="Excluir região"
                     class="p-1.5 rounded-lg text-erro hover:bg-erro/10 border-0 bg-transparent cursor-pointer">
@@ -85,77 +63,26 @@
                 <!-- Cabeçalho unidades -->
                 <div class="flex items-center justify-between mb-3">
                   <p class="text-sm font-semibold text-texto-suave">Unidades</p>
-                  <button (click)="abrirFormUnidade(regiao.id)"
-                    class="flex items-center gap-1 text-sm bg-sucesso text-white px-3 py-1.5 rounded-lg font-medium hover:bg-sucesso-escuro transition-colors border-0 cursor-pointer">
+                  <a [routerLink]="['/admin/regioes', regiao.id, 'unidades', 'nova']"
+                    class="flex items-center gap-1 text-sm bg-sucesso text-white px-3 py-1.5 rounded-lg font-medium hover:bg-sucesso-escuro transition-colors border-0 cursor-pointer no-underline">
                     <mat-icon class="text-sm">add</mat-icon>
                     Nova Unidade
-                  </button>
+                  </a>
                 </div>
-                <!-- Form Unidade -->
-                @if (mostrarFormUnidade() === regiao.id) {
-                  <div class="bg-superficie rounded-xl border border-borda p-4 mb-3">
-                    <div class="flex items-center justify-between mb-3">
-                      <h3 class="text-sm font-semibold text-texto">{{ editandoUnidade() ? 'Editar Unidade' : 'Nova Unidade' }}</h3>
-                      <button (click)="fecharFormUnidade()" class="text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer p-1 rounded-sm">
-                        <mat-icon class="text-sm">close</mat-icon>
-                      </button>
-                    </div>
-                    <form [formGroup]="formUnidade" (ngSubmit)="salvarUnidade(regiao.id)">
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                        <div class="lms-field">
-                          <label class="lms-label">Nome da Unidade <span class="required">*</span></label>
-                          <input type="text" class="lms-input" formControlName="nome" placeholder="Ex: Unidade Centro" />
-                        </div>
-                        <div class="lms-field">
-                          <label class="lms-label">Endereço</label>
-                          <input type="text" class="lms-input" formControlName="endereco" placeholder="Ex: Rua das Flores, 123" />
-                        </div>
-                        <div class="md:col-span-2">
-                          <p class="text-xs font-medium text-texto-suave mb-1.5">Foto da Unidade</p>
-                          <app-image-upload
-                            [currentUrl]="editandoUnidade()?.imagemUrl ?? null"
-                            placeholder="Foto da unidade"
-                            shape="rect"
-                            [loading]="uploadandoImagem()"
-                            (fileSelected)="onImagemUnidadeSelected($event)">
-                          </app-image-upload>
-                        </div>
-                      </div>
-                      <div class="flex justify-end gap-2">
-                        <button type="button" (click)="fecharFormUnidade()"
-                          class="px-4 py-2 rounded-lg text-texto text-sm font-medium hover:bg-superficie-2 transition-colors border border-borda bg-superficie cursor-pointer">
-                          Cancelar
-                        </button>
-                        <button type="submit" [disabled]="salvando() || formUnidade.invalid"
-                          class="flex items-center gap-1 bg-sucesso text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sucesso-escuro transition-colors disabled:opacity-50 border-0 cursor-pointer">
-                          <mat-icon class="text-sm">save</mat-icon>
-                          {{ salvando() ? 'Salvando...' : 'Salvar' }}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                }
                 <!-- Lista de unidades -->
-                @if (getUnidades(regiao.id).length === 0 && mostrarFormUnidade() !== regiao.id) {
-                  <div
-                    class="text-center py-4 text-sm text-texto-suave">
+                @if (getUnidades(regiao.id).length === 0) {
+                  <div class="text-center py-4 text-sm text-texto-suave">
                     Nenhuma unidade. Clique em "Nova Unidade" para adicionar.
                   </div>
                 }
                 @for (unidade of getUnidades(regiao.id); track unidade.id) {
-                  <div
-                    class="bg-superficie rounded-xl border border-borda p-3 mb-2 flex items-center gap-3 justify-between">
+                  <div class="bg-superficie rounded-xl border border-borda p-3 mb-2 flex items-center gap-3 justify-between">
                     <!-- Thumbnail -->
-                    <div class="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-superficie-2">
+                    <div class="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-superficie-2 flex items-center justify-center">
                       @if (unidade.imagemUrl) {
-                        <img [src]="unidade.imagemUrl"
-                          [alt]="unidade.nome" class="w-full h-full object-cover" loading="lazy">
-                      }
-                      @if (!unidade.imagemUrl) {
-                        <div
-                          class="w-full h-full flex items-center justify-center">
-                          <mat-icon class="text-gray-300 text-sm">location_city</mat-icon>
-                        </div>
+                        <img [src]="unidade.imagemUrl" [alt]="unidade.nome" class="w-full h-full object-cover" loading="lazy">
+                      } @else {
+                        <mat-icon class="text-gray-300 text-sm">location_city</mat-icon>
                       }
                     </div>
                     <div class="flex-1 min-w-0">
@@ -165,10 +92,14 @@
                       }
                     </div>
                     <div class="flex gap-1">
-                      <button (click)="abrirFormUnidade(regiao.id, unidade)" matTooltip="Editar"
-                        class="p-1.5 rounded-lg text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer">
+                      <a [routerLink]="['/unidades', unidade.slug]" target="_blank" rel="noopener" matTooltip="Ver no site"
+                        class="p-1.5 rounded-lg text-texto-suave hover:text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer no-underline flex items-center justify-center">
+                        <mat-icon class="text-sm">open_in_new</mat-icon>
+                      </a>
+                      <a [routerLink]="['/admin/regioes', regiao.id, 'unidades', unidade.id, 'editar']" matTooltip="Editar"
+                        class="p-1.5 rounded-lg text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer no-underline flex items-center justify-center">
                         <mat-icon class="text-sm">edit</mat-icon>
-                      </button>
+                      </a>
                       <button (click)="deletarUnidade(regiao.id, unidade)" matTooltip="Excluir"
                         class="p-1.5 rounded-lg text-erro hover:bg-erro/10 border-0 bg-transparent cursor-pointer">
                         <mat-icon class="text-sm">delete</mat-icon>

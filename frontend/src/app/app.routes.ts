@@ -94,15 +94,53 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/cursos/admin-cursos.component').then(m => m.AdminCursosComponent)
   },
+  // Criação/edição em páginas dedicadas — antes eram painéis que abriam dentro
+  // das próprias listagens. Rotas mais específicas ('novo'/'nova') vêm antes
+  // das paramétricas de mesma profundidade.
+  {
+    path: 'admin/cursos/novo',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/cursos/curso-form/admin-curso-form.component').then(m => m.AdminCursoFormComponent)
+  },
+  {
+    path: 'admin/cursos/:id/editar',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/cursos/curso-form/admin-curso-form.component').then(m => m.AdminCursoFormComponent)
+  },
   {
     path: 'admin/usuarios',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/usuarios/admin-usuarios.component').then(m => m.AdminUsuariosComponent)
   },
   {
+    path: 'admin/usuarios/:id/editar',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/usuarios/usuario-form/admin-usuario-form.component').then(m => m.AdminUsuarioFormComponent)
+  },
+  {
     path: 'admin/regioes',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/regioes/admin-regioes.component').then(m => m.AdminRegioesComponent)
+  },
+  {
+    path: 'admin/regioes/nova',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/regioes/regiao-form/admin-regiao-form.component').then(m => m.AdminRegiaoFormComponent)
+  },
+  {
+    path: 'admin/regioes/:id/editar',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/regioes/regiao-form/admin-regiao-form.component').then(m => m.AdminRegiaoFormComponent)
+  },
+  {
+    path: 'admin/regioes/:regiaoId/unidades/nova',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/regioes/unidade-form/admin-unidade-form.component').then(m => m.AdminUnidadeFormComponent)
+  },
+  {
+    path: 'admin/regioes/:regiaoId/unidades/:unidadeId/editar',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/regioes/unidade-form/admin-unidade-form.component').then(m => m.AdminUnidadeFormComponent)
   },
   {
     path: 'admin/professores',

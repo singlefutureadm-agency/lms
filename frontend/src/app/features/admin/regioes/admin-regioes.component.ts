@@ -1,45 +1,35 @@
 import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { CursoService, Regiao, Unidade } from '../../../core/services/curso.service';
-import { UploadService } from '../../../core/services/upload.service';
-import { ImageUploadComponent } from '../../../shared/image-upload/image-upload.component';
-import { mensagemDeErro } from '../../../core/interceptors/error.interceptor';
 
+/**
+ * Listagem de regiões e suas unidades.
+ *
+ * Criar/editar região e unidade acontecem em páginas próprias
+ * (AdminRegiaoFormComponent e AdminUnidadeFormComponent) — este componente só
+ * lista e exclui. Os formulários abriam dentro do accordion, onde a foto da
+ * unidade ficava numa faixa estreita.
+ */
 @Component({
     selector: 'app-admin-regioes',
-    imports: [ReactiveFormsModule, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatExpansionModule, ImageUploadComponent],
+    imports: [RouterLink, MatIconModule, MatSnackBarModule, MatProgressSpinnerModule, MatTooltipModule, MatExpansionModule],
     templateUrl: './admin-regioes.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrls: ['./admin-regioes.component.scss']
 })
 export class AdminRegioesComponent implements OnInit {
   private svc = inject(CursoService);
-  private uploadSvc = inject(UploadService);
-  private fb = inject(FormBuilder);
   private snack = inject(MatSnackBar);
 
   regioes = signal<Regiao[]>([]);
   unidadesPorRegiao = signal<Record<number, Unidade[]>>({});
   loading = signal(true);
-  salvando = signal(false);
-  mostrarFormRegiao = signal(false);
-  editandoRegiao = signal<Regiao | null>(null);
-  mostrarFormUnidade = signal<number | null>(null);
-  editandoUnidade = signal<Unidade | null>(null);
-  imagemUnidadeSelecionada = signal<File | null>(null);
-  uploadandoImagem = signal(false);
-
-  formRegiao = this.fb.group({ nome: ['', Validators.required] });
-  formUnidade = this.fb.group({
-    nome: ['', Validators.required],
-    endereco: ['']
-  });
 
   ngOnInit() { this.carregar(); }
 
@@ -60,43 +50,6 @@ export class AdminRegioesComponent implements OnInit {
     });
   }
 
-  // --- Regiões ---
-  abrirFormRegiao(regiao?: Regiao) {
-    this.editandoRegiao.set(regiao || null);
-    this.formRegiao.setValue({ nome: regiao?.nome || '' });
-    this.mostrarFormRegiao.set(true);
-  }
-
-  fecharFormRegiao() {
-    this.mostrarFormRegiao.set(false);
-    this.editandoRegiao.set(null);
-    this.formRegiao.reset();
-  }
-
-  salvarRegiao() {
-    if (this.formRegiao.invalid) return;
-    this.salvando.set(true);
-    const nome = this.formRegiao.value.nome!;
-    const editando = this.editandoRegiao();
-
-    const obs = editando
-      ? this.svc.atualizarRegiao(editando.id, nome)
-      : this.svc.criarRegiao(nome);
-
-    obs.subscribe({
-      next: () => {
-        this.snack.open(editando ? 'Região atualizada!' : 'Região criada!', 'OK', { duration: 3000 });
-        this.fecharFormRegiao();
-        this.carregar();
-        this.salvando.set(false);
-      },
-      error: (e: any) => {
-        this.snack.open(mensagemDeErro(e, 'Erro ao salvar região'), 'Fechar', { duration: 3000 });
-        this.salvando.set(false);
-      }
-    });
-  }
-
   deletarRegiao(regiao: Regiao) {
     if (!confirm(`Excluir a região "${regiao.nome}" e todas as suas unidades?`)) return;
     this.svc.deletarRegiao(regiao.id).subscribe({
@@ -105,56 +58,6 @@ export class AdminRegioesComponent implements OnInit {
         this.carregar();
       },
       error: () => this.snack.open('Erro ao excluir região', 'Fechar', { duration: 3000 })
-    });
-  }
-
-  // --- Unidades ---
-  abrirFormUnidade(regiaoId: number, unidade?: Unidade) {
-    this.editandoUnidade.set(unidade || null);
-    this.formUnidade.setValue({ nome: unidade?.nome || '', endereco: unidade?.endereco || '' });
-    this.mostrarFormUnidade.set(regiaoId);
-  }
-
-  fecharFormUnidade() {
-    this.mostrarFormUnidade.set(null);
-    this.editandoUnidade.set(null);
-    this.formUnidade.reset();
-    this.imagemUnidadeSelecionada.set(null);
-  }
-
-  onImagemUnidadeSelected(file: File) { this.imagemUnidadeSelecionada.set(file); }
-
-  salvarUnidade(regiaoId: number) {
-    if (this.formUnidade.invalid) return;
-    this.salvando.set(true);
-    const data = { nome: this.formUnidade.value.nome!, endereco: this.formUnidade.value.endereco || '' };
-    const editando = this.editandoUnidade();
-
-    const obs = editando
-      ? this.svc.atualizarUnidade(regiaoId, editando.id, data)
-      : this.svc.criarUnidade(regiaoId, data);
-
-    obs.subscribe({
-      next: (unidade: Unidade) => {
-        this.salvando.set(false);
-        this.snack.open(editando ? 'Unidade atualizada!' : 'Unidade criada!', 'OK', { duration: 3000 });
-        const imagem = this.imagemUnidadeSelecionada();
-        if (imagem) {
-          this.uploadandoImagem.set(true);
-          this.uploadSvc.uploadUnidade(unidade.id, imagem).subscribe({
-            next: () => { this.uploadandoImagem.set(false); this.fecharFormUnidade(); this.carregarUnidades(regiaoId); this.carregar(); },
-            error: () => { this.uploadandoImagem.set(false); this.fecharFormUnidade(); this.carregarUnidades(regiaoId); this.carregar(); }
-          });
-        } else {
-          this.fecharFormUnidade();
-          this.carregarUnidades(regiaoId);
-          this.carregar();
-        }
-      },
-      error: (e: any) => {
-        this.snack.open(mensagemDeErro(e, 'Erro ao salvar unidade'), 'Fechar', { duration: 3000 });
-        this.salvando.set(false);
-      }
     });
   }
 

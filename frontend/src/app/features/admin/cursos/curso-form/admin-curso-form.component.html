@@ -1,0 +1,463 @@
+<div class="min-h-screen bg-fundo py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- Trilha de volta para a listagem -->
+    <a routerLink="/admin/cursos"
+      class="inline-flex items-center gap-1.5 text-sm text-texto-suave hover:text-marca transition-colors mb-4 no-underline">
+      <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">arrow_back</mat-icon>
+      Gerenciar Cursos
+    </a>
+
+    @if (carregando()) {
+      <div class="flex justify-center py-24">
+        <mat-spinner diameter="48"></mat-spinner>
+      </div>
+    }
+
+    @if (!carregando() && naoEncontrado()) {
+      <div class="bg-superficie rounded-2xl border border-borda p-16 text-center">
+        <mat-icon class="text-gray-300 mb-4" style="font-size:64px;height:64px;width:64px;">search_off</mat-icon>
+        <p class="text-texto font-medium">Curso não encontrado</p>
+        <p class="text-texto-suave text-sm mt-1">Ele pode ter sido removido ou desativado.</p>
+        <a routerLink="/admin/cursos"
+          class="inline-flex items-center gap-2 mt-5 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors no-underline">
+          Voltar para a listagem
+        </a>
+      </div>
+    }
+
+    @if (!carregando() && !naoEncontrado()) {
+      <form [formGroup]="form" (ngSubmit)="salvar()" class="block w-full">
+
+        <!-- ─── Cabeçalho da página ───────────────────────────────────── -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+          <div class="min-w-0">
+            <h1 class="text-2xl font-bold text-texto">{{ ehEdicao() ? 'Editar Curso' : 'Novo Curso' }}</h1>
+            <p class="text-texto-suave text-sm mt-1 truncate">
+              @if (ehEdicao()) {
+                {{ curso()?.titulo }} · ID #{{ cursoId() }}
+              } @else {
+                Preencha os dados abaixo para publicar um novo curso
+              }
+            </p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            @if (ehEdicao()) {
+              <a [routerLink]="['/cursos', cursoId()]" target="_blank" rel="noopener"
+                matTooltip="Abre a página pública do curso numa nova aba"
+                class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border border-borda bg-superficie text-texto hover:border-marca hover:text-marca transition-colors no-underline">
+                <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">open_in_new</mat-icon>
+                Ver no site
+              </a>
+            }
+            <button type="button" (click)="voltar()"
+              class="px-4 py-2.5 rounded-xl text-texto font-medium text-sm hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors">
+              Cancelar
+            </button>
+            <button type="submit" [disabled]="!podeSalvar()"
+              class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
+              <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() || enviandoVideos() ? 'hourglass_empty' : 'save' }}</mat-icon>
+              <span>
+                @if (salvando()) { Salvando... }
+                @else if (enviandoVideos()) { Enviando vídeo{{ progressoVideos() != null ? ' (' + progressoVideos() + '%)' : '...' }} }
+                @else { Salvar Curso }
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ─── Capa ampliada + resumo do que está publicado ──────────── -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div class="lg:col-span-2 bg-superficie rounded-2xl shadow-xs border border-borda p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-base font-bold text-texto">Capa do Curso</h2>
+                <p class="text-xs text-texto-suave mt-0.5">Clique na imagem ou arraste um arquivo · 1280×720 recomendado</p>
+              </div>
+              @if (curso()?.imagemUrl) {
+                <a [href]="curso()!.imagemUrl" target="_blank" rel="noopener"
+                  class="text-xs text-marca hover:text-marca-escura no-underline flex items-center gap-1">
+                  <mat-icon style="font-size:14px;height:14px;width:14px;line-height:14px;">zoom_in</mat-icon>
+                  Tamanho real
+                </a>
+              }
+            </div>
+            <app-image-upload [currentUrl]="curso()?.imagemUrl ?? null"
+              placeholder="Nenhuma capa definida — clique para enviar (1280×720 recomendado)"
+              shape="hero" [loading]="uploadandoCapa()"
+              (fileSelected)="onCapaSelected($event)">
+            </app-image-upload>
+            @if (imagemSelecionada()) {
+              <p class="text-xs text-aviso mt-2 flex items-center gap-1">
+                <mat-icon style="font-size:14px;height:14px;width:14px;line-height:14px;">info</mat-icon>
+                Nova capa selecionada — só será enviada ao salvar o curso.
+              </p>
+            }
+          </div>
+
+          <!-- Painel de informações do curso -->
+          <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-5">
+            <h2 class="text-base font-bold text-texto mb-4">Informações</h2>
+            @if (ehEdicao()) {
+              <dl class="space-y-3 text-sm">
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-texto-suave shrink-0">Nível</dt>
+                  <dd class="text-right">
+                    <span [class]="getNivelClass(curso()?.nivel)" class="lms-badge">{{ curso()?.nivel }}</span>
+                  </dd>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-texto-suave shrink-0">Área</dt>
+                  <dd class="text-texto text-right">{{ curso()?.areaNome || '—' }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-texto-suave shrink-0">Unidade</dt>
+                  <dd class="text-texto text-right">{{ curso()?.unidadeNome || 'Curso geral' }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-texto-suave shrink-0">Módulos</dt>
+                  <dd class="text-texto text-right">{{ curso()?.modulos?.length ?? 0 }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-texto-suave shrink-0">Aulas</dt>
+                  <dd class="text-texto text-right">{{ totalAulas() }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-texto-suave shrink-0">Criado em</dt>
+                  <dd class="text-texto text-right">{{ curso()?.criadoEm | date:'dd/MM/yyyy' }}</dd>
+                </div>
+              </dl>
+
+              @if (curso()?.tipos?.length || curso()?.categorias?.length) {
+                <div class="mt-4 pt-4 border-t border-borda">
+                  <p class="text-xs font-semibold text-texto-suave uppercase tracking-wide mb-2">Classificação atual</p>
+                  <div class="flex flex-wrap gap-1">
+                    @for (t of curso()?.tipos ?? []; track t.id) {
+                      <span class="lms-badge lms-badge-destaque">{{ t.nome }}</span>
+                    }
+                    @for (cat of curso()?.categorias ?? []; track cat.id) {
+                      <span class="lms-badge lms-badge-marca">{{ cat.nome }}</span>
+                    }
+                  </div>
+                </div>
+              }
+
+              <a [routerLink]="['/cursos', cursoId()]" target="_blank" rel="noopener"
+                class="flex items-center justify-center gap-1.5 w-full mt-5 px-4 py-2.5 rounded-xl text-sm font-medium border border-borda bg-superficie text-texto hover:border-marca hover:bg-superficie-2 transition-colors no-underline">
+                <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">visibility</mat-icon>
+                Visualizar no site
+              </a>
+              <p class="text-xs text-texto-suave mt-2 text-center">Mostra a página pública como o aluno a vê</p>
+            } @else {
+              <p class="text-sm text-texto-suave">
+                As informações e o link de visualização pública aparecem aqui depois que o curso for salvo pela primeira vez.
+              </p>
+            }
+          </div>
+        </div>
+
+        <!-- ─── Dados principais ──────────────────────────────────────── -->
+        <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6 mb-6">
+          <h2 class="text-base font-bold text-texto mb-4">Dados do Curso</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2 lms-field">
+              <label class="lms-label">Título do Curso <span class="required">*</span></label>
+              <input type="text" class="lms-input w-full" formControlName="titulo"
+                placeholder="Ex: Java para Iniciantes" />
+            </div>
+            <div class="lms-field">
+              <label class="lms-label">Nível <span class="required">*</span></label>
+              <select class="lms-select w-full" formControlName="nivel">
+                @for (n of niveis; track n) {
+                  <option [value]="n">{{ n }}</option>
+                }
+              </select>
+            </div>
+            <div class="lms-field">
+              <label class="lms-label">Área <span class="required">*</span></label>
+              <select class="lms-select w-full" formControlName="areaId">
+                <option [ngValue]="null" disabled>Selecione a área</option>
+                @for (a of areas(); track a.id) {
+                  <option [ngValue]="a.id">{{ a.nome }}</option>
+                }
+              </select>
+            </div>
+            <div class="lms-field md:col-span-2">
+              <label class="lms-label">Unidade</label>
+              <select class="lms-select w-full" formControlName="unidadeId">
+                <option [ngValue]="null">Nenhuma (curso geral)</option>
+                @for (u of unidades(); track u.id) {
+                  <option [ngValue]="u.id">{{ u.nome }} — {{ u.regiaoNome }}</option>
+                }
+              </select>
+            </div>
+            <div class="md:col-span-3 lms-field">
+              <label class="lms-label">Descrição</label>
+              <textarea class="lms-textarea w-full" formControlName="descricao" rows="4"
+                placeholder="Objetivos e conteúdo do curso"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── Classificação ─────────────────────────────────────────── -->
+        <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6 mb-6">
+          <h2 class="text-base font-bold text-texto mb-1">Classificação do Curso</h2>
+          <p class="text-xs text-texto-suave mb-4">Refine com categorias específicas e o tipo de ensino (técnico, graduação,
+            pós-graduação etc.)</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Categorias -->
+            <div>
+              <label class="lms-label mb-2 block">Categorias (opcional)</label>
+              <div class="max-h-64 overflow-y-auto border border-borda rounded-xl p-3 space-y-3">
+                @for (area of areas(); track area.id) {
+                  <div>
+                    <p class="text-xs font-semibold text-texto-suave uppercase mb-1">{{ area.nome }}</p>
+                    @for (cat of area.categorias; track cat.id) {
+                      <label class="flex items-center gap-2 text-sm text-texto py-1 cursor-pointer">
+                        <input type="checkbox" [checked]="categoriasSelecionadas().has(cat.id)"
+                          (change)="toggleCategoria(cat.id)"
+                          class="rounded-sm border-gray-300 text-marca focus:ring-indigo-500" />
+                        {{ cat.nome }}
+                      </label>
+                    }
+                  </div>
+                }
+                @if (areas().length === 0) {
+                  <p class="text-xs text-texto-suave">Nenhuma área cadastrada.</p>
+                }
+              </div>
+            </div>
+            <!-- Tipo de Ensino -->
+            <div>
+              <label class="lms-label mb-2 block">Tipo de Ensino</label>
+              <div class="border border-borda rounded-xl p-3 space-y-1">
+                @for (tipo of tiposDisponiveis(); track tipo.id) {
+                  <label class="flex items-center gap-2 text-sm text-texto py-1 cursor-pointer">
+                    <input type="checkbox" [checked]="tiposSelecionados().has(tipo.id)"
+                      (change)="toggleTipo(tipo.id)"
+                      class="rounded-sm border-gray-300 text-marca focus:ring-indigo-500" />
+                    {{ tipo.nome }}
+                  </label>
+                }
+                @if (tiposDisponiveis().length === 0) {
+                  <p class="text-xs text-texto-suave">Nenhum tipo cadastrado.</p>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── Módulos ───────────────────────────────────────────────── -->
+        <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6 mb-6">
+          <div class="flex items-center justify-between mb-4 w-full">
+            <div class="block">
+              <h2 class="text-base font-bold text-texto notranslate" translate="no">Módulos do Curso</h2>
+              <p class="text-xs text-texto-suave mt-0.5">Gerencie as divisões de ensino deste curso</p>
+            </div>
+            <button type="button" (click)="adicionarModulo()"
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-marca hover:bg-marca-escura text-white text-xs font-semibold rounded-xl border-0 cursor-pointer transition-colors shadow-xs h-9 min-w-[150px]">
+              <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">add</mat-icon>
+              <span>Adicionar Módulo</span>
+            </button>
+          </div>
+
+          @if (modulosFormArray.length === 0) {
+            <div class="p-6 text-center bg-fundo rounded-xl border border-dashed border-borda mb-4 block w-full">
+              <mat-icon class="text-gray-300" style="font-size:32px;height:32px;width:32px;">view_module</mat-icon>
+              <p class="text-xs text-texto-suave mt-1">Nenhum módulo adicionado. Clique em "Adicionar Módulo" para começar.</p>
+            </div>
+          }
+
+          <div [formArrayName]="'modulos'" class="space-y-3 block w-full">
+            @for (moduloGroup of modulosFormArray.controls; track moduloGroup; let idx = $index) {
+              <div class="bg-fundo rounded-xl border border-borda block w-full overflow-hidden">
+                <div [formGroupName]="idx" class="flex items-center gap-3 p-3">
+                  <span
+                    class="w-7 h-7 bg-superficie text-texto-suave rounded-lg text-xs font-bold flex items-center justify-center border border-borda shrink-0">
+                    {{ idx + 1 }}
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <input type="text" formControlName="titulo" placeholder="Ex: Fundamentos da Linguagem"
+                      class="w-full px-4 py-2 bg-superficie rounded-xl border border-borda focus:outline-none focus:border-indigo-500 text-sm text-texto block" />
+                  </div>
+                  @if (moduloGroup.value.id) {
+                    <button type="button" (click)="toggleAulasModulo(moduloGroup.value.id)"
+                      class="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium border border-borda bg-superficie text-texto hover:border-marca transition-colors cursor-pointer shrink-0">
+                      <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">play_lesson</mat-icon>
+                      {{ getAulas(moduloGroup.value.id).length }} aula(s)
+                    </button>
+                  }
+                  <button type="button" (click)="removerModulo(idx)"
+                    class="p-2 text-texto-suave hover:text-erro hover:bg-erro/10 rounded-xl border-0 cursor-pointer bg-transparent transition-colors shrink-0 flex items-center justify-center">
+                    <mat-icon style="font-size:20px;height:20px;width:20px;">delete</mat-icon>
+                  </button>
+                </div>
+
+                <!-- Vídeo do módulo: arquivo (upload imediato se o módulo já tem
+                     id, pendente até salvar o curso se ainda for novo) ou link de
+                     YouTube/Vimeo (síncrono, salvo junto com o resto do módulo).
+                     Só uma das duas opções fica preenchida por módulo. -->
+                <div class="px-3 pb-3">
+                  <p class="text-xs font-medium text-texto-suave mb-1.5">Vídeo do módulo (opcional)</p>
+
+                  @if (!tipoVideoAtivo(idx, moduloGroup)) {
+                    <div class="flex gap-2">
+                      <button type="button" (click)="escolherModoArquivo(idx)"
+                        class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-borda bg-superficie text-texto text-xs font-medium hover:border-marca hover:text-marca cursor-pointer transition-colors">
+                        <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">upload</mat-icon>
+                        Enviar arquivo
+                      </button>
+                      <button type="button" (click)="escolherModoLink(idx)"
+                        class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-borda bg-superficie text-texto text-xs font-medium hover:border-marca hover:text-marca cursor-pointer transition-colors">
+                        <mat-icon style="font-size:16px;height:16px;width:16px;line-height:16px;">link</mat-icon>
+                        Link do YouTube/Vimeo
+                      </button>
+                    </div>
+                  }
+
+                  @if (tipoVideoAtivo(idx, moduloGroup) === 'ARQUIVO') {
+                    <app-video-upload
+                      [currentUrl]="moduloGroup.value.urlVideo"
+                      [temVideo]="temVideoModulo(idx, moduloGroup)"
+                      [loading]="progressoPorModulo().has(idx)"
+                      [progress]="progressoPorModulo().get(idx) ?? null"
+                      (fileSelected)="onVideoSelected(idx, $event)"
+                      (removerVideo)="onRemoverVideo(idx)">
+                    </app-video-upload>
+                    @if (!temVideoModulo(idx, moduloGroup)) {
+                      <button type="button" (click)="cancelarEscolhaVideo(idx)"
+                        class="text-xs text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer mt-1.5 underline p-0">
+                        Cancelar
+                      </button>
+                    }
+                  }
+
+                  @if (tipoVideoAtivo(idx, moduloGroup) === 'YOUTUBE' || tipoVideoAtivo(idx, moduloGroup) === 'VIMEO') {
+                    @if (moduloGroup.value.tipoVideo && moduloGroup.value.urlVideo) {
+                      <div class="relative">
+                        <app-video-embed [url]="moduloGroup.value.urlVideo" [tipo]="moduloGroup.value.tipoVideo">
+                        </app-video-embed>
+                        <button type="button" (click)="onRemoverVideo(idx)"
+                          class="absolute top-2 right-2 z-10 p-1.5 bg-black/60 hover:bg-erro text-white rounded-lg border-0 cursor-pointer transition-colors flex items-center justify-center">
+                          <mat-icon style="font-size:18px;height:18px;width:18px;">delete</mat-icon>
+                        </button>
+                      </div>
+                    } @else {
+                      <div>
+                        <input type="url" [value]="moduloGroup.value.urlVideo || ''"
+                          (input)="onLinkVideoChange(idx, $any($event.target).value)"
+                          placeholder="https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                          class="w-full px-4 py-2 bg-superficie rounded-xl border border-borda focus:outline-none focus:border-indigo-500 text-sm text-texto block" />
+                        @if (erroLinkVideo().get(idx)) {
+                          <p class="text-erro text-xs mt-1.5">{{ erroLinkVideo().get(idx) }}</p>
+                        }
+                        <button type="button" (click)="cancelarEscolhaVideo(idx)"
+                          class="text-xs text-texto-suave hover:text-texto bg-transparent border-0 cursor-pointer mt-1.5 underline p-0">
+                          Cancelar
+                        </button>
+                      </div>
+                    }
+                  }
+                </div>
+
+                <!-- Aulas do módulo: CRUD próprio, só disponível para módulos já salvos -->
+                @if (!moduloGroup.value.id) {
+                  <p class="text-xs text-texto-suave px-3 pb-3">Salve o curso para gerenciar as aulas deste módulo.</p>
+                }
+                @if (moduloGroup.value.id && moduloAulasExpandido() === moduloGroup.value.id) {
+                  <div class="border-t border-borda bg-superficie px-3 py-3">
+                    @for (aula of getAulas(moduloGroup.value.id); track aula.id) {
+                      <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-fundo">
+                        <span
+                          class="w-6 h-6 bg-fundo text-texto-suave rounded-md text-xs font-bold flex items-center justify-center border border-borda shrink-0">
+                          {{ aula.ordem }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm font-medium text-texto truncate">{{ aula.titulo }}</p>
+                          <p class="text-xs text-texto-suave">{{ aula.duracaoMin }} min
+                            @if (aula.urlVideo) { · vídeo }
+                          </p>
+                        </div>
+                        <button type="button" (click)="abrirFormAula(moduloGroup.value.id, aula)"
+                          class="p-1.5 text-texto-suave hover:text-marca hover:bg-marca-suave rounded-lg border-0 bg-transparent cursor-pointer shrink-0">
+                          <mat-icon style="font-size:18px;height:18px;width:18px;">edit</mat-icon>
+                        </button>
+                        <button type="button" (click)="excluirAula(moduloGroup.value.id, aula)"
+                          class="p-1.5 text-texto-suave hover:text-erro hover:bg-erro/10 rounded-lg border-0 bg-transparent cursor-pointer shrink-0">
+                          <mat-icon style="font-size:18px;height:18px;width:18px;">delete</mat-icon>
+                        </button>
+                      </div>
+                    }
+                    @if (getAulas(moduloGroup.value.id).length === 0 && moduloAulaAtivo() !== moduloGroup.value.id) {
+                      <p class="text-xs text-texto-suave py-2">Nenhuma aula cadastrada neste módulo.</p>
+                    }
+
+                    <!-- Form de aula (criar/editar) -->
+                    @if (moduloAulaAtivo() === moduloGroup.value.id) {
+                      <form [formGroup]="aulaForm" (ngSubmit)="salvarAula(moduloGroup.value.id)"
+                        class="bg-fundo rounded-lg border border-marca-suave p-3 mt-2">
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                          <div class="col-span-2 lms-field">
+                            <label class="lms-label">Título <span class="required">*</span></label>
+                            <input type="text" class="lms-input" formControlName="titulo" placeholder="Ex: Introdução" />
+                          </div>
+                          <div class="col-span-2 lms-field">
+                            <label class="lms-label">URL do vídeo</label>
+                            <input type="text" class="lms-input" formControlName="urlVideo" placeholder="https://..." />
+                          </div>
+                          <div class="lms-field">
+                            <label class="lms-label">Duração (min)</label>
+                            <input type="number" min="0" class="lms-input" formControlName="duracaoMin" />
+                          </div>
+                          <div class="lms-field">
+                            <label class="lms-label">Ordem</label>
+                            <input type="number" min="1" class="lms-input" formControlName="ordem" />
+                          </div>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                          <button type="button" (click)="fecharFormAula()"
+                            class="px-3 py-1.5 rounded-lg text-texto text-xs font-medium hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer">
+                            Cancelar
+                          </button>
+                          <button type="submit" [disabled]="salvandoAula() || aulaForm.invalid"
+                            class="flex items-center gap-1 bg-marca text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer">
+                            <mat-icon style="font-size:14px;height:14px;width:14px;">save</mat-icon>
+                            {{ salvandoAula() ? 'Salvando...' : (editandoAula() ? 'Salvar' : 'Adicionar') }}
+                          </button>
+                        </div>
+                      </form>
+                    }
+                    @if (moduloAulaAtivo() !== moduloGroup.value.id) {
+                      <button type="button" (click)="abrirFormAula(moduloGroup.value.id)"
+                        class="flex items-center gap-1 text-xs text-marca hover:text-marca-escura bg-transparent border-0 cursor-pointer mt-2 font-medium">
+                        <mat-icon style="font-size:16px;height:16px;width:16px;">add</mat-icon>
+                        Adicionar aula
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- ─── Ações do rodapé ───────────────────────────────────────── -->
+        <div class="flex justify-end gap-3 pb-4">
+          <button type="button" (click)="voltar()"
+            class="px-5 py-2.5 rounded-xl text-texto font-medium hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors text-sm">
+            Cancelar
+          </button>
+          <button type="submit" [disabled]="!podeSalvar()"
+            class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
+            <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() || enviandoVideos() ? 'hourglass_empty' : 'save' }}</mat-icon>
+            <span>
+              @if (salvando()) { Salvando... }
+              @else if (enviandoVideos()) { Enviando vídeo{{ progressoVideos() != null ? ' (' + progressoVideos() + '%)' : '...' }} }
+              @else { Salvar Curso }
+            </span>
+          </button>
+        </div>
+      </form>
+    }
+  </div>
+</div>

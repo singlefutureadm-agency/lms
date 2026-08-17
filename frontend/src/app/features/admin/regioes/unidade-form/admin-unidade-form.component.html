@@ -1,0 +1,124 @@
+<div class="min-h-screen bg-fundo py-8">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <a [routerLink]="['/admin/regioes', regiaoId(), 'editar']"
+      class="inline-flex items-center gap-1.5 text-sm text-texto-suave hover:text-marca transition-colors mb-4 no-underline">
+      <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">arrow_back</mat-icon>
+      {{ regiao()?.nome || 'Região' }}
+    </a>
+
+    @if (carregando()) {
+      <div class="flex justify-center py-24">
+        <mat-spinner diameter="48"></mat-spinner>
+      </div>
+    }
+
+    @if (!carregando() && naoEncontrada()) {
+      <div class="bg-superficie rounded-2xl border border-borda p-16 text-center">
+        <mat-icon class="text-gray-300 mb-4" style="font-size:64px;height:64px;width:64px;">location_off</mat-icon>
+        <p class="text-texto font-medium">Unidade não encontrada</p>
+        <a routerLink="/admin/regioes"
+          class="inline-flex items-center gap-2 mt-5 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors no-underline">
+          Voltar para a listagem
+        </a>
+      </div>
+    }
+
+    @if (!carregando() && !naoEncontrada()) {
+      <!-- Cabeçalho -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold text-texto">{{ ehEdicao() ? 'Editar Unidade' : 'Nova Unidade' }}</h1>
+          <p class="text-texto-suave text-sm mt-1 truncate">
+            @if (ehEdicao()) {
+              {{ unidade()?.nome }} · ID #{{ unidadeId() }} · {{ regiao()?.nome }}
+            } @else {
+              Nova unidade em {{ regiao()?.nome }}
+            }
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          @if (ehEdicao() && unidade()?.slug) {
+            <a [routerLink]="['/unidades', unidade()!.slug]" target="_blank" rel="noopener"
+              matTooltip="Abre a página pública da unidade numa nova aba"
+              class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border border-borda bg-superficie text-texto hover:border-marca hover:text-marca transition-colors no-underline">
+              <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">open_in_new</mat-icon>
+              Ver no site
+            </a>
+          }
+          <button type="button" (click)="voltar()"
+            class="px-4 py-2.5 rounded-xl text-texto font-medium text-sm hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors">
+            Cancelar
+          </button>
+          <button type="button" (click)="salvar()" [disabled]="salvando() || uploadandoImagem() || form.invalid"
+            class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
+            <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() || uploadandoImagem() ? 'hourglass_empty' : 'save' }}</mat-icon>
+            {{ salvando() ? 'Salvando...' : (uploadandoImagem() ? 'Enviando foto...' : 'Salvar Unidade') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Foto ampliada -->
+        <div class="lg:col-span-2 bg-superficie rounded-2xl shadow-xs border border-borda p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-base font-bold text-texto">Foto da Unidade</h2>
+              <p class="text-xs text-texto-suave mt-0.5">Clique na imagem ou arraste um arquivo</p>
+            </div>
+            @if (unidade()?.imagemUrl) {
+              <a [href]="unidade()!.imagemUrl" target="_blank" rel="noopener"
+                class="text-xs text-marca hover:text-marca-escura no-underline flex items-center gap-1">
+                <mat-icon style="font-size:14px;height:14px;width:14px;line-height:14px;">zoom_in</mat-icon>
+                Tamanho real
+              </a>
+            }
+          </div>
+          <app-image-upload [currentUrl]="unidade()?.imagemUrl ?? null"
+            placeholder="Nenhuma foto definida — clique para enviar"
+            shape="hero" [loading]="uploadandoImagem()"
+            (fileSelected)="onImagemSelected($event)">
+          </app-image-upload>
+          @if (imagemSelecionada()) {
+            <p class="text-xs text-aviso mt-2 flex items-center gap-1">
+              <mat-icon style="font-size:14px;height:14px;width:14px;line-height:14px;">info</mat-icon>
+              Nova foto selecionada — só será enviada ao salvar a unidade.
+            </p>
+          }
+        </div>
+
+        <!-- Campos + informações -->
+        <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6">
+          <h2 class="text-base font-bold text-texto mb-4">Dados</h2>
+          <form [formGroup]="form" (ngSubmit)="salvar()" class="space-y-4">
+            <div class="lms-field">
+              <label class="lms-label">Nome da Unidade <span class="required">*</span></label>
+              <input type="text" class="lms-input" formControlName="nome" placeholder="Ex: Unidade Centro" />
+            </div>
+            <div class="lms-field">
+              <label class="lms-label">Endereço</label>
+              <input type="text" class="lms-input" formControlName="endereco" placeholder="Ex: Rua das Flores, 123" />
+            </div>
+          </form>
+
+          @if (ehEdicao()) {
+            <dl class="space-y-3 text-sm mt-6 pt-5 border-t border-borda">
+              <div class="flex items-start justify-between gap-3">
+                <dt class="text-texto-suave shrink-0">Região</dt>
+                <dd class="text-texto text-right">{{ unidade()?.regiaoNome }}</dd>
+              </div>
+              <!-- "Slug" é identificador: tradutor automático do navegador o
+                   verte para "Lesma" e o valor deixa de ser reconhecível. -->
+              <div class="flex items-start justify-between gap-3 notranslate" translate="no">
+                <dt class="text-texto-suave shrink-0">Slug</dt>
+                <dd class="text-texto text-right break-all">{{ unidade()?.slug }}</dd>
+              </div>
+            </dl>
+            <p class="lms-hint mt-3">O slug é derivado do nome e muda junto com ele — links antigos para esta unidade deixam de funcionar após renomeá-la.</p>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

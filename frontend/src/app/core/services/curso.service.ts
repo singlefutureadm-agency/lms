@@ -171,6 +171,10 @@ export class CursoService {
     return this.http.get<Regiao[]>(`${environment.apiUrl}/regioes`);
   }
 
+  buscarRegiao(id: number) {
+    return this.http.get<Regiao>(`${environment.apiUrl}/regioes/${id}`);
+  }
+
   criarRegiao(nome: string) {
     return this.http.post<Regiao>(`${environment.apiUrl}/regioes`, { nome });
   }

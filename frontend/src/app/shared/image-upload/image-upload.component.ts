@@ -60,7 +60,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 export class ImageUploadComponent {
   @Input() currentUrl: string | null | undefined = null;
   @Input() placeholder = 'Clique ou arraste uma imagem';
-  @Input() shape: 'circle' | 'rect' = 'rect';
+  /**
+   * `hero` é a variante das páginas dedicadas de edição: mesma mecânica de
+   * upload, mas em 16:9 fluido em vez da faixa fixa de 192px do `rect` — é o
+   * que permite ver a capa já existente em tamanho grande antes de trocá-la.
+   */
+  @Input() shape: 'circle' | 'circle-lg' | 'rect' | 'hero' = 'rect';
   @Input() loading = false;
   @Output() fileSelected = new EventEmitter<File>();
 
@@ -71,9 +76,10 @@ export class ImageUploadComponent {
   private readonly ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
 
   get containerClass(): string {
-    return this.shape === 'circle'
-      ? 'w-24 h-24 rounded-full'
-      : 'w-full h-48 rounded-xl';
+    if (this.shape === 'circle') return 'w-24 h-24 rounded-full';
+    if (this.shape === 'circle-lg') return 'w-40 h-40 rounded-full';
+    if (this.shape === 'hero') return 'w-full aspect-video rounded-2xl';
+    return 'w-full h-48 rounded-xl';
   }
 
   displayUrl(): string | null {

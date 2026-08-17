@@ -1,14 +1,20 @@
 import { Component, computed, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CursoService, Unidade, UsuarioResponse } from '../../../core/services/curso.service';
 import { mensagemDeErro } from '../../../core/interceptors/error.interceptor';
 
+/**
+ * Listagem administrativa de usuários. A edição vive em página própria
+ * (`/admin/usuarios/:id/editar`, ver AdminUsuarioFormComponent) — aqui ficam
+ * só a listagem e a criação rápida (nome/email/senha, três campos).
+ */
 @Component({
     selector: 'app-admin-usuarios',
-    imports: [CommonModule, FormsModule, MatIconModule, MatSnackBarModule],
+    imports: [CommonModule, FormsModule, RouterLink, MatIconModule, MatSnackBarModule],
     templateUrl: './admin-usuarios.component.html',
     changeDetection: ChangeDetectionStrategy.Eager,
     styles: []
@@ -18,22 +24,15 @@ export class AdminUsuariosComponent implements OnInit {
   private snack = inject(MatSnackBar);
 
   readonly backendBase = 'http://localhost:8080';
-  readonly roles = ['ADMIN', 'PROFESSOR', 'ALUNO'];
 
   usuarios = signal<UsuarioResponse[]>([]);
   unidades = signal<Unidade[]>([]);
   loading = signal(true);
   salvando = signal(false);
-  editandoId = signal<number | null>(null);
   mostrarFormCriar = signal(false);
-  fotoPreview = signal<string | null>(null);
 
   adminCount = computed(() => this.usuarios().filter(u => u.role === 'ADMIN').length);
   professoresCount = computed(() => this.usuarios().filter(u => u.role === 'PROFESSOR').length);
-
-  editForm: { nome: string; email: string; role: string; unidadeId: number | null } = {
-    nome: '', email: '', role: 'ALUNO', unidadeId: null
-  };
 
   criarForm: { nome: string; email: string; senha: string } = {
     nome: '', email: '', senha: ''
@@ -51,53 +50,6 @@ export class AdminUsuariosComponent implements OnInit {
     });
     this.svc.listarTodasUnidades().subscribe({
       next: data => this.unidades.set(data)
-    });
-  }
-
-  abrirEditar(u: UsuarioResponse): void {
-    this.editandoId.set(u.id);
-    this.editForm = { nome: u.nome, email: u.email, role: u.role, unidadeId: u.unidadeId ?? null };
-    this.fotoPreview.set(null);
-  }
-
-  fecharEditar(): void {
-    this.editandoId.set(null);
-    this.fotoPreview.set(null);
-  }
-
-  salvarEdicao(userId: number): void {
-    if (!this.editForm.nome || !this.editForm.email) return;
-    this.salvando.set(true);
-    this.svc.atualizarUsuario(userId, this.editForm).subscribe({
-      next: (updated) => {
-        this.usuarios.update(list => list.map(u => u.id === userId ? updated : u));
-        this.fecharEditar();
-        this.salvando.set(false);
-        this.snack.open('Usuário atualizado!', 'OK', { duration: 3000 });
-      },
-      error: (e: any) => {
-        this.snack.open(mensagemDeErro(e, 'Erro ao atualizar'), 'Fechar', { duration: 3000 });
-        this.salvando.set(false);
-      }
-    });
-  }
-
-  onFileSelected(event: Event, usuarioId: number): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files?.length) return;
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = () => this.fotoPreview.set(reader.result as string);
-    reader.readAsDataURL(file);
-    this.svc.uploadAvatar(usuarioId, file).subscribe({
-      next: (updated) => {
-        this.usuarios.update(list => list.map(u => u.id === usuarioId ? updated : u));
-        this.snack.open('Foto atualizada!', 'OK', { duration: 2000 });
-      },
-      error: () => {
-        this.fotoPreview.set(null);
-        this.snack.open('Erro ao fazer upload da foto', 'Fechar', { duration: 3000 });
-      }
     });
   }
 
@@ -127,27 +79,18 @@ export class AdminUsuariosComponent implements OnInit {
     });
   }
 
-  isEditing(id: number): boolean {
-    return this.editandoId() === id;
-  }
-
+  /**
+   * O backend grava a URL já absoluta (`app.upload.base-url` + caminho), mas
+   * nem todo registro antigo tem — prefixar às cegas produziria
+   * `http://localhost:8080http://...`. Só completa o que vier relativo.
+   */
   getAvatarSrc(u: UsuarioResponse): string | null {
-    if (u.avatarUrl) return this.backendBase + u.avatarUrl;
-    return null;
-  }
-
-  getEditAvatarSrc(u: UsuarioResponse): string | null {
-    if (this.fotoPreview()) return this.fotoPreview();
-    if (u.avatarUrl) return this.backendBase + u.avatarUrl;
-    return null;
+    if (!u.avatarUrl) return null;
+    return /^https?:\/\//i.test(u.avatarUrl) ? u.avatarUrl : this.backendBase + u.avatarUrl;
   }
 
   hasPhoto(u: UsuarioResponse): boolean {
     return !!u.avatarUrl;
-  }
-
-  hasEditPhoto(u: UsuarioResponse): boolean {
-    return !!(this.fotoPreview() || u.avatarUrl);
   }
 
   getInitial(nome: string): string {
@@ -156,11 +99,11 @@ export class AdminUsuariosComponent implements OnInit {
 
   getRoleBadgeClass(role: string): string {
     const map: Record<string, string> = {
-      ADMIN:     'bg-purple-100 text-purple-700 border border-purple-200',
-      PROFESSOR: 'bg-emerald-100 text-sucesso border border-emerald-200',
-      ALUNO:     'bg-marca-suave text-marca-escura border border-marca-suave',
+      ADMIN:     'lms-badge lms-badge-destaque',
+      PROFESSOR: 'lms-badge lms-badge-sucesso',
+      ALUNO:     'lms-badge lms-badge-marca',
     };
-    return map[role] ?? 'bg-superficie-2 text-texto-suave border border-borda';
+    return map[role] ?? 'lms-badge lms-badge-neutro';
   }
 
   getAvatarBg(role: string): string {

@@ -1,0 +1,129 @@
+<div class="min-h-screen bg-fundo py-8">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <a routerLink="/admin/usuarios"
+      class="inline-flex items-center gap-1.5 text-sm text-texto-suave hover:text-marca transition-colors mb-4 no-underline">
+      <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">arrow_back</mat-icon>
+      Gerenciar Usuários
+    </a>
+
+    @if (carregando()) {
+      <div class="flex justify-center py-24">
+        <mat-spinner diameter="48"></mat-spinner>
+      </div>
+    }
+
+    @if (!carregando() && naoEncontrado()) {
+      <div class="bg-superficie rounded-2xl border border-borda p-16 text-center">
+        <mat-icon class="text-gray-300 mb-4" style="font-size:64px;height:64px;width:64px;">person_off</mat-icon>
+        <p class="text-texto font-medium">Usuário não encontrado</p>
+        <a routerLink="/admin/usuarios"
+          class="inline-flex items-center gap-2 mt-5 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors no-underline">
+          Voltar para a listagem
+        </a>
+      </div>
+    }
+
+    @if (!carregando() && !naoEncontrado()) {
+      <!-- Cabeçalho -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold text-texto">Editar Usuário</h1>
+          <p class="text-texto-suave text-sm mt-1 truncate">{{ usuario()?.nome }} · ID #{{ usuarioId() }}</p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" (click)="voltar()"
+            class="px-4 py-2.5 rounded-xl text-texto font-medium text-sm hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors">
+            Cancelar
+          </button>
+          <button type="button" (click)="salvar()" [disabled]="salvando() || !form.nome || !form.email"
+            class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
+            <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ? 'hourglass_empty' : 'save' }}</mat-icon>
+            {{ salvando() ? 'Salvando...' : 'Salvar Alterações' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Foto ampliada + resumo -->
+        <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6">
+          <h2 class="text-base font-bold text-texto mb-4">Foto de perfil</h2>
+          <div class="flex justify-center">
+            <app-image-upload [currentUrl]="avatarUrl()"
+              placeholder="Clique para enviar"
+              shape="circle-lg" [loading]="enviandoFoto()"
+              (fileSelected)="onFotoSelected($event)">
+            </app-image-upload>
+          </div>
+          <p class="text-xs text-texto-suave text-center mt-3">Clique na foto para trocar · JPG, PNG ou WebP até 5MB</p>
+          <p class="text-xs text-texto-suave text-center mt-1">A foto é enviada assim que selecionada.</p>
+
+          <dl class="space-y-3 text-sm mt-6 pt-5 border-t border-borda">
+            <div class="flex items-center justify-between gap-3">
+              <dt class="text-texto-suave">Perfil atual</dt>
+              <dd>
+                <span [class]="getRoleBadgeClass(usuario()?.role)">
+                  {{ usuario()?.role }}
+                </span>
+              </dd>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <dt class="text-texto-suave shrink-0">Email</dt>
+              <dd class="text-texto text-right break-all">{{ usuario()?.email }}</dd>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <dt class="text-texto-suave shrink-0">Unidade</dt>
+              <dd class="text-texto text-right">{{ usuario()?.unidadeNome || 'Sem unidade' }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Campos -->
+        <div class="lg:col-span-2 bg-superficie rounded-2xl shadow-xs border border-borda p-6">
+          <h2 class="text-base font-bold text-texto mb-4">Dados do Usuário</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="lms-field sm:col-span-2">
+              <label class="lms-label">Nome completo <span class="required">*</span></label>
+              <input type="text" class="lms-input" [(ngModel)]="form.nome" placeholder="Nome completo" />
+            </div>
+            <div class="lms-field sm:col-span-2">
+              <label class="lms-label">Email <span class="required">*</span></label>
+              <input type="email" class="lms-input" [(ngModel)]="form.email" placeholder="email@dominio.com" />
+            </div>
+            <div class="lms-field">
+              <label class="lms-label">Perfil <span class="required">*</span></label>
+              <select class="lms-select" [(ngModel)]="form.role">
+                @for (r of roles; track r) {
+                  <option [value]="r">{{ r }}</option>
+                }
+              </select>
+              <p class="lms-hint">Define o que o usuário enxerga e pode fazer no sistema.</p>
+            </div>
+            <div class="lms-field">
+              <label class="lms-label">Unidade</label>
+              <select class="lms-select" [(ngModel)]="form.unidadeId">
+                <option [ngValue]="null">Sem unidade</option>
+                @for (un of unidades(); track un.id) {
+                  <option [ngValue]="un.id">{{ un.nome }} — {{ un.regiaoNome }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-6 pt-5 border-t border-borda">
+            <button type="button" (click)="voltar()"
+              class="px-5 py-2.5 rounded-xl text-texto font-medium hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors text-sm">
+              Cancelar
+            </button>
+            <button type="button" (click)="salvar()" [disabled]="salvando() || !form.nome || !form.email"
+              class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
+              <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ? 'hourglass_empty' : 'save' }}</mat-icon>
+              {{ salvando() ? 'Salvando...' : 'Salvar Alterações' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

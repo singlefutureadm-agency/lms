@@ -1,0 +1,120 @@
+<div class="min-h-screen bg-fundo py-8">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <a routerLink="/admin/regioes"
+      class="inline-flex items-center gap-1.5 text-sm text-texto-suave hover:text-marca transition-colors mb-4 no-underline">
+      <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">arrow_back</mat-icon>
+      Regiões e Unidades
+    </a>
+
+    @if (carregando()) {
+      <div class="flex justify-center py-24">
+        <mat-spinner diameter="48"></mat-spinner>
+      </div>
+    }
+
+    @if (!carregando() && naoEncontrada()) {
+      <div class="bg-superficie rounded-2xl border border-borda p-16 text-center">
+        <mat-icon class="text-gray-300 mb-4" style="font-size:64px;height:64px;width:64px;">location_off</mat-icon>
+        <p class="text-texto font-medium">Região não encontrada</p>
+        <a routerLink="/admin/regioes"
+          class="inline-flex items-center gap-2 mt-5 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura transition-colors no-underline">
+          Voltar para a listagem
+        </a>
+      </div>
+    }
+
+    @if (!carregando() && !naoEncontrada()) {
+      <!-- Cabeçalho -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold text-texto">{{ ehEdicao() ? 'Editar Região' : 'Nova Região' }}</h1>
+          <p class="text-texto-suave text-sm mt-1 truncate">
+            @if (ehEdicao()) {
+              {{ regiao()?.nome }} · ID #{{ regiaoId() }} · {{ regiao()?.totalUnidades ?? 0 }} unidade(s)
+            } @else {
+              Depois de criar a região você poderá cadastrar as unidades dela
+            }
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" (click)="voltar()"
+            class="px-4 py-2.5 rounded-xl text-texto font-medium text-sm hover:bg-superficie-2 border border-borda bg-superficie cursor-pointer transition-colors">
+            Cancelar
+          </button>
+          <button type="button" (click)="salvar()" [disabled]="salvando() || form.invalid"
+            class="flex items-center gap-2 bg-marca text-white px-5 py-2.5 rounded-xl font-medium hover:bg-marca-escura disabled:opacity-50 border-0 cursor-pointer transition-colors text-sm shadow-xs">
+            <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">{{ salvando() ? 'hourglass_empty' : 'save' }}</mat-icon>
+            {{ salvando() ? 'Salvando...' : 'Salvar Região' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Dados da região -->
+      <form [formGroup]="form" (ngSubmit)="salvar()"
+        class="bg-superficie rounded-2xl shadow-xs border border-borda p-6 mb-6">
+        <h2 class="text-base font-bold text-texto mb-4">Dados da Região</h2>
+        <div class="lms-field max-w-md">
+          <label class="lms-label">Nome da Região <span class="required">*</span></label>
+          <input type="text" class="lms-input" formControlName="nome" placeholder="Ex: Região Centro" />
+        </div>
+      </form>
+
+      <!-- Unidades da região -->
+      @if (ehEdicao()) {
+        <div class="bg-superficie rounded-2xl shadow-xs border border-borda p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-texto">Unidades desta região</h2>
+              <p class="text-xs text-texto-suave mt-0.5">{{ unidades().length }} unidade(s) cadastrada(s)</p>
+            </div>
+            <a [routerLink]="['/admin/regioes', regiaoId(), 'unidades', 'nova']"
+              class="flex items-center gap-1 text-sm bg-sucesso text-white px-4 py-2 rounded-xl font-medium hover:bg-sucesso-escuro transition-colors border-0 cursor-pointer no-underline">
+              <mat-icon style="font-size:18px;height:18px;width:18px;line-height:18px;">add</mat-icon>
+              Nova Unidade
+            </a>
+          </div>
+
+          @if (unidades().length === 0) {
+            <div class="p-8 text-center bg-fundo rounded-xl border border-dashed border-borda">
+              <mat-icon class="text-gray-300" style="font-size:32px;height:32px;width:32px;">location_city</mat-icon>
+              <p class="text-xs text-texto-suave mt-1">Nenhuma unidade nesta região.</p>
+            </div>
+          }
+
+          @for (unidade of unidades(); track unidade.id) {
+            <div class="bg-fundo rounded-xl border border-borda p-3 mb-2 flex items-center gap-3 justify-between">
+              <div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-superficie-2 flex items-center justify-center">
+                @if (unidade.imagemUrl) {
+                  <img [src]="unidade.imagemUrl" [alt]="unidade.nome" class="w-full h-full object-cover" loading="lazy" />
+                } @else {
+                  <mat-icon class="text-gray-300">location_city</mat-icon>
+                }
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-texto text-sm truncate">{{ unidade.nome }}</p>
+                @if (unidade.endereco) {
+                  <p class="text-xs text-texto-suave truncate">{{ unidade.endereco }}</p>
+                }
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <a [routerLink]="['/unidades', unidade.slug]" target="_blank" rel="noopener" matTooltip="Ver no site"
+                  class="p-2 rounded-lg text-texto-suave hover:text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer no-underline flex items-center justify-center">
+                  <mat-icon style="font-size:18px;height:18px;width:18px;">open_in_new</mat-icon>
+                </a>
+                <a [routerLink]="['/admin/regioes', regiaoId(), 'unidades', unidade.id, 'editar']" matTooltip="Editar unidade"
+                  class="p-2 rounded-lg text-marca hover:bg-marca-suave border-0 bg-transparent cursor-pointer no-underline flex items-center justify-center">
+                  <mat-icon style="font-size:18px;height:18px;width:18px;">edit</mat-icon>
+                </a>
+                <button type="button" (click)="excluirUnidade(unidade)" matTooltip="Excluir unidade"
+                  class="p-2 rounded-lg text-erro hover:bg-erro/10 border-0 bg-transparent cursor-pointer flex items-center justify-center">
+                  <mat-icon style="font-size:18px;height:18px;width:18px;">delete</mat-icon>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>
